@@ -1,0 +1,554 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getProducts, type Product } from "@/lib/products";
+import { getCustomers, type Customer } from "@/lib/customers";
+import {
+  computeItemTotal,
+  computeInvoiceTotals,
+  nextInvoiceNumber,
+  saveInvoice,
+  type Invoice,
+  type InvoiceItem,
+} from "@/lib/invoices";
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Local item state (same shape as InvoiceItem)
+──────────────────────────────────────────────────────────────────────────── */
+
+type ItemRow = InvoiceItem;
+
+function emptyItem(): ItemRow {
+  return {
+    id: crypto.randomUUID(),
+    productId: "",
+    variantId: "",
+    productName: "",
+    variantLabel: "",
+    sku: "",
+    unitPrice: 0,
+    quantity: 1,
+    total: 0,
+  };
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function faDate(iso: string) {
+  try {
+    return new Date(iso).toLocaleDateString("fa-IR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+const fa = (n: number) => Math.round(n).toLocaleString("fa-IR");
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Props
+──────────────────────────────────────────────────────────────────────────── */
+
+type Props = {
+  initialInvoice?: Invoice;
+  isNew?: boolean;
+};
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Component
+──────────────────────────────────────────────────────────────────────────── */
+
+export default function InvoiceEditor({
+  initialInvoice,
+  isNew = true,
+}: Props) {
+  const router = useRouter();
+  const invoiceId = useRef(initialInvoice?.id ?? crypto.randomUUID());
+
+  /* ── Data from localStorage ─────────────────────────────────────────── */
+  const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+
+  /* ── Invoice header fields ──────────────────────────────────────────── */
+  const [invNumber, setInvNumber] = useState(initialInvoice?.number ?? "");
+  const [date, setDate] = useState(initialInvoice?.date ?? todayIso());
+  const [customerId, setCustomerId] = useState(initialInvoice?.customerId ?? "");
+  const [customerName, setCustomerName] = useState(initialInvoice?.customerName ?? "");
+  const [customerPhone, setCustomerPhone] = useState(initialInvoice?.customerPhone ?? "");
+  const [customerAddress, setCustomerAddress] = useState(initialInvoice?.customerAddress ?? "");
+  const [notes, setNotes] = useState(initialInvoice?.notes ?? "");
+  const [discount, setDiscount] = useState(initialInvoice?.discount ?? 0);
+  const [items, setItems] = useState<ItemRow[]>(initialInvoice?.items ?? []);
+
+  useEffect(() => {
+    const load = async () => {
+      setProducts(await getProducts());
+      setCustomers(await getCustomers());
+      if (isNew) setInvNumber(await nextInvoiceNumber());
+    };
+    void load();
+  }, [isNew]);
+
+  /* ── Customer select → auto-fill fields ─────────────────────────────── */
+  const handleCustomerSelect = (id: string) => {
+    setCustomerId(id);
+    const c = customers.find((x) => x.id === id);
+    if (c) {
+      setCustomerName(c.name);
+      setCustomerPhone(c.phone);
+      setCustomerAddress(c.address);
+    }
+  };
+
+  /* ── Item helpers ────────────────────────────────────────────────────── */
+  const addItem = () => setItems((prev) => [...prev, emptyItem()]);
+
+  const removeItem = (id: string) =>
+    setItems((prev) => prev.filter((i) => i.id !== id));
+
+  const updateItem = useCallback(
+    (id: string, changes: Partial<ItemRow>) => {
+      setItems((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) return item;
+          const next = { ...item, ...changes };
+
+          /* Product changed → auto-select first variant */
+          if (changes.productId !== undefined) {
+            const product = products.find((p) => p.id === changes.productId);
+            if (product) {
+              next.productName = product.name;
+              const v = product.variants[0];
+              if (v) {
+                next.variantId = v.id;
+                next.variantLabel =
+                  Object.values(v.attributeValues).join(" / ") || "ساده";
+                next.sku = v.sku;
+                next.unitPrice = v.salePrice;
+              } else {
+                next.variantId = "";
+                next.variantLabel = "";
+                next.sku = "";
+                next.unitPrice = 0;
+              }
+            }
+          }
+
+          /* Variant changed → update label / sku / price */
+          if (changes.variantId !== undefined && changes.productId === undefined) {
+            const product = products.find((p) => p.id === next.productId);
+            const v = product?.variants.find((x) => x.id === changes.variantId);
+            if (v) {
+              next.variantLabel =
+                Object.values(v.attributeValues).join(" / ") || "ساده";
+              next.sku = v.sku;
+              next.unitPrice = v.salePrice;
+            }
+          }
+
+          next.total = computeItemTotal(next.unitPrice, next.quantity);
+          return next;
+        }),
+      );
+    },
+    [products],
+  );
+
+  /* ── Computed totals ─────────────────────────────────────────────────── */
+  const { subtotal, total } = computeInvoiceTotals(items, discount);
+
+  /* ── Build final Invoice object ─────────────────────────────────────── */
+  const buildInvoice = (status: Invoice["status"]): Invoice => ({
+    id: invoiceId.current,
+    number: invNumber,
+    date,
+    customerId,
+    customerName,
+    customerPhone,
+    customerAddress,
+    items,
+    notes,
+    discount,
+    subtotal,
+    total,
+    status,
+    createdAt: initialInvoice?.createdAt ?? new Date().toISOString(),
+  });
+
+  const handleSave = async (status: Invoice["status"]) => {
+    if (!invNumber.trim()) { alert("شماره فاکتور را وارد کنید."); return; }
+    await saveInvoice(buildInvoice(status));
+    router.push("/sales");
+  };
+
+  const handlePrint = () => window.print();
+
+  /* ── Input class helper ──────────────────────────────────────────────── */
+  const inp =
+    "rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm text-[#16191f] placeholder:text-[#879596] outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]";
+
+  const smallInp =
+    "rounded border border-[#aab7b8] bg-white px-2 py-1.5 text-xs text-[#16191f] outline-none focus:border-[#0073bb] w-full tabular-nums";
+
+  /* ───────────────────────────────────────────────────────────────────── */
+  return (
+    <>
+      {/* ══════════════════════════════════════════════════════════════════
+          SCREEN VIEW  (hidden when printing)
+      ══════════════════════════════════════════════════════════════════ */}
+      <div className="flex w-full flex-col gap-5 p-6 print:hidden">
+
+        {/* ── Page header ───────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d5dbdb] pb-4">
+          <div>
+            <h1 className="text-xl font-bold text-[#16191f]">
+              {isNew ? "فاکتور جدید" : `فاکتور ${invNumber}`}
+            </h1>
+            <p className="mt-0.5 text-sm text-[#545b64]">
+              اقلام را وارد کنید، سپس ذخیره یا چاپ کنید.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => router.push("/sales")}
+              className="rounded border border-[#aab7b8] bg-white px-4 py-2 text-sm font-medium text-[#16191f] hover:bg-[#f2f3f3] transition"
+            >
+              انصراف
+            </button>
+            {!isNew && (
+              <button
+                onClick={handlePrint}
+                className="rounded border border-[#0073bb] bg-white px-4 py-2 text-sm font-medium text-[#0073bb] hover:bg-[#e7f2f8] transition"
+              >
+                چاپ فاکتور
+              </button>
+            )}
+            <button
+              onClick={() => void handleSave("draft")}
+              className="rounded border border-[#aab7b8] bg-white px-4 py-2 text-sm font-medium text-[#16191f] hover:bg-[#f2f3f3] transition"
+            >
+              ذخیره پیش‌نویس
+            </button>
+            <button
+              onClick={() => void handleSave("confirmed")}
+              className="rounded bg-[#ec7211] px-4 py-2 text-sm font-medium text-white hover:bg-[#eb5f07] transition"
+            >
+              تأیید و ذخیره
+            </button>
+          </div>
+        </div>
+
+        {/* ── Invoice info + customer ────────────────────────────────── */}
+        <div className="grid gap-4 lg:grid-cols-2">
+
+          {/* Invoice details */}
+          <div className="rounded border border-[#d5dbdb] bg-white shadow-sm">
+            <div className="border-b border-[#d5dbdb] bg-[#f2f3f3] px-4 py-3">
+              <h2 className="text-sm font-semibold text-[#16191f]">اطلاعات فاکتور</h2>
+            </div>
+            <div className="grid gap-4 p-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-[#545b64]">شماره فاکتور</span>
+                <input value={invNumber} onChange={(e) => setInvNumber(e.target.value)} className={inp} />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-[#545b64]">تاریخ</span>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inp} />
+              </label>
+              <label className="flex flex-col gap-1.5 sm:col-span-2">
+                <span className="text-xs font-medium text-[#545b64]">توضیحات</span>
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+                  className={`${inp} resize-none`} />
+              </label>
+            </div>
+          </div>
+
+          {/* Customer */}
+          <div className="rounded border border-[#d5dbdb] bg-white shadow-sm">
+            <div className="border-b border-[#d5dbdb] bg-[#f2f3f3] px-4 py-3">
+              <h2 className="text-sm font-semibold text-[#16191f]">اطلاعات مشتری</h2>
+            </div>
+            <div className="grid gap-4 p-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-1.5 sm:col-span-2">
+                <span className="text-xs font-medium text-[#545b64]">انتخاب از لیست مشتریان</span>
+                <select value={customerId} onChange={(e) => handleCustomerSelect(e.target.value)} className={inp}>
+                  <option value="">— وارد کردن دستی —</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-[#545b64]">نام مشتری</span>
+                <input value={customerName} onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="نام" className={inp} />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-[#545b64]">تلفن</span>
+                <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="09xxxxxxxxx" className={inp} />
+              </label>
+              <label className="flex flex-col gap-1.5 sm:col-span-2">
+                <span className="text-xs font-medium text-[#545b64]">آدرس</span>
+                <input value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)}
+                  placeholder="آدرس" className={inp} />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Invoice items ──────────────────────────────────────────── */}
+        <div className="rounded border border-[#d5dbdb] bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-[#d5dbdb] bg-[#f2f3f3] px-4 py-3">
+            <h2 className="text-sm font-semibold text-[#16191f]">اقلام فاکتور</h2>
+            <button onClick={addItem}
+              className="rounded border border-[#0073bb] bg-white px-3 py-1.5 text-xs font-medium text-[#0073bb] hover:bg-[#e7f2f8] transition">
+              + افزودن قلم
+            </button>
+          </div>
+
+          {items.length === 0 ? (
+            <p className="px-4 py-10 text-center text-sm text-[#879596]">
+              هیچ قلمی ثبت نشده — روی «افزودن قلم» کلیک کنید.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-[#d5dbdb] text-right">
+                    <th className="px-3 py-2.5 text-xs font-semibold text-[#545b64] w-8">#</th>
+                    <th className="px-3 py-2.5 text-xs font-semibold text-[#545b64]">محصول</th>
+                    <th className="px-3 py-2.5 text-xs font-semibold text-[#545b64]">ترکیب</th>
+                    <th className="px-3 py-2.5 text-xs font-semibold text-[#545b64] w-24">کد SKU</th>
+                    <th className="px-3 py-2.5 text-xs font-semibold text-[#545b64] w-32">قیمت واحد</th>
+                    <th className="px-3 py-2.5 text-xs font-semibold text-[#545b64] w-20">تعداد</th>
+                    <th className="px-3 py-2.5 text-xs font-semibold text-[#545b64] w-32">جمع (تومان)</th>
+                    <th className="px-3 py-2.5 w-8" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, idx) => {
+                    const product = products.find((p) => p.id === item.productId);
+                    const variants = product?.variants ?? [];
+                    return (
+                      <tr key={item.id} className="border-b border-[#f2f3f3] hover:bg-[#f8f9f9]">
+                        <td className="px-3 py-2 text-[#879596] text-xs">{idx + 1}</td>
+
+                        {/* Product */}
+                        <td className="px-3 py-2">
+                          <select value={item.productId}
+                            onChange={(e) => updateItem(item.id, { productId: e.target.value })}
+                            className="rounded border border-[#aab7b8] bg-white px-2 py-1.5 text-xs text-[#16191f] outline-none focus:border-[#0073bb] w-36">
+                            <option value="">انتخاب محصول…</option>
+                            {products.map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                        </td>
+
+                        {/* Variant */}
+                        <td className="px-3 py-2">
+                          <select value={item.variantId}
+                            onChange={(e) => updateItem(item.id, { variantId: e.target.value })}
+                            disabled={!item.productId}
+                            className="rounded border border-[#aab7b8] bg-white px-2 py-1.5 text-xs text-[#16191f] outline-none focus:border-[#0073bb] w-32 disabled:opacity-50">
+                            <option value="">انتخاب ترکیب…</option>
+                            {variants.map((v) => {
+                              const lbl =
+                                Object.values(v.attributeValues).join(" / ") || "ساده";
+                              return <option key={v.id} value={v.id}>{lbl}</option>;
+                            })}
+                          </select>
+                        </td>
+
+                        {/* SKU */}
+                        <td className="px-3 py-2 font-mono text-xs text-[#545b64]">
+                          {item.sku || "—"}
+                        </td>
+
+                        {/* Unit price */}
+                        <td className="px-3 py-2">
+                          <input type="number" min="0" value={item.unitPrice}
+                            onChange={(e) => updateItem(item.id, { unitPrice: Number(e.target.value) || 0 })}
+                            className={smallInp + " w-28"} />
+                        </td>
+
+                        {/* Quantity */}
+                        <td className="px-3 py-2">
+                          <input type="number" min="1" value={item.quantity}
+                            onChange={(e) => updateItem(item.id, { quantity: Math.max(1, Number(e.target.value)) })}
+                            className={smallInp + " w-16"} />
+                        </td>
+
+                        {/* Total */}
+                        <td className="px-3 py-2 tabular-nums font-semibold text-[#16191f]">
+                          {fa(item.total)}
+                        </td>
+
+                        {/* Delete */}
+                        <td className="px-3 py-2 text-center">
+                          <button onClick={() => removeItem(item.id)}
+                            className="text-lg font-bold text-[#d13212] hover:text-[#ba2a0c] leading-none">
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ── Totals bar ─────────────────────────────────────────── */}
+          {items.length > 0 && (
+            <div className="border-t border-[#d5dbdb] p-4">
+              <div className="flex justify-end">
+                <div className="w-72 space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#545b64]">جمع اقلام:</span>
+                    <span className="tabular-nums font-medium text-[#16191f]">{fa(subtotal)} تومان</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[#545b64] shrink-0">تخفیف (تومان):</span>
+                    <input type="number" min="0" value={discount}
+                      onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+                      className="rounded border border-[#aab7b8] bg-white px-2 py-1 text-xs text-[#16191f] outline-none focus:border-[#0073bb] w-28 tabular-nums" />
+                  </div>
+                  <div className="flex items-center justify-between rounded border border-[#0073bb] bg-[#e7f2f8] px-3 py-2 font-bold">
+                    <span className="text-[#0073bb]">قابل پرداخت:</span>
+                    <span className="tabular-nums text-[#0073bb]">{fa(total)} تومان</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Print hint when in edit mode */}
+        {isNew && (
+          <p className="text-xs text-[#879596]">
+            پس از ذخیره، دکمه «چاپ فاکتور» در همین صفحه فعال می‌شود.
+          </p>
+        )}
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          PRINT VIEW  (only visible when window.print() is called)
+      ══════════════════════════════════════════════════════════════════ */}
+      <div className="hidden print:block bg-white text-[#16191f]">
+        <div className="mx-auto max-w-[780px] p-10">
+
+          {/* Header */}
+          <div className="mb-8 flex items-start justify-between border-b-2 border-[#16191f] pb-5">
+            <div>
+              <h1 className="text-2xl font-bold">سیستم حسابداری</h1>
+              <p className="mt-1 text-sm text-[#545b64]">فاکتور فروش</p>
+            </div>
+            <div className="text-left">
+              <p className="text-2xl font-bold text-[#0073bb]">{invNumber}</p>
+              <p className="mt-1 text-sm text-[#545b64]">تاریخ: {faDate(date)}</p>
+            </div>
+          </div>
+
+          {/* Customer info */}
+          {customerName && (
+            <div className="mb-6 rounded border border-[#d5dbdb] p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#545b64]">
+                مشتری
+              </p>
+              <p className="font-bold text-[#16191f]">{customerName}</p>
+              {customerPhone && <p className="mt-0.5 text-sm text-[#545b64]">تلفن: {customerPhone}</p>}
+              {customerAddress && <p className="mt-0.5 text-sm text-[#545b64]">آدرس: {customerAddress}</p>}
+            </div>
+          )}
+
+          {/* Items */}
+          <table className="mb-6 w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b-2 border-[#16191f] text-right">
+                <th className="py-2 pl-4 text-xs font-semibold text-[#545b64]">#</th>
+                <th className="py-2 pl-4 text-xs font-semibold text-[#545b64]">شرح کالا</th>
+                <th className="py-2 pl-4 text-xs font-semibold text-[#545b64]">کد</th>
+                <th className="py-2 pl-4 text-right text-xs font-semibold text-[#545b64]">قیمت واحد</th>
+                <th className="py-2 pl-4 text-right text-xs font-semibold text-[#545b64]">تعداد</th>
+                <th className="py-2 text-right text-xs font-semibold text-[#545b64]">جمع</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, i) => (
+                <tr key={item.id} className="border-b border-[#d5dbdb]">
+                  <td className="py-2.5 pl-4 text-[#545b64]">{i + 1}</td>
+                  <td className="py-2.5 pl-4">
+                    <p className="font-medium">{item.productName}</p>
+                    {item.variantLabel && item.variantLabel !== "ساده" && (
+                      <p className="text-xs text-[#545b64]">{item.variantLabel}</p>
+                    )}
+                  </td>
+                  <td className="py-2.5 pl-4 font-mono text-xs text-[#545b64]">
+                    {item.sku || "—"}
+                  </td>
+                  <td className="py-2.5 pl-4 tabular-nums text-left">{fa(item.unitPrice)}</td>
+                  <td className="py-2.5 pl-4 text-left">{item.quantity}</td>
+                  <td className="py-2.5 tabular-nums font-semibold text-left">{fa(item.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Totals */}
+          <div className="flex justify-end">
+            <div className="w-72 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-[#545b64]">جمع کل:</span>
+                <span className="tabular-nums">{fa(subtotal)} تومان</span>
+              </div>
+              {discount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-[#545b64]">تخفیف:</span>
+                  <span className="tabular-nums text-[#d13212]">({fa(discount)}) تومان</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t-2 border-[#16191f] pt-2 font-bold">
+                <span>مبلغ قابل پرداخت:</span>
+                <span className="tabular-nums text-[#0073bb]">{fa(total)} تومان</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          {notes && (
+            <div className="mt-8 rounded border border-[#d5dbdb] p-4">
+              <p className="mb-1 text-xs font-semibold text-[#545b64]">توضیحات</p>
+              <p className="text-sm">{notes}</p>
+            </div>
+          )}
+
+          {/* Signature line */}
+          <div className="mt-16 grid grid-cols-3 gap-8 text-center text-xs text-[#545b64]">
+            <div>
+              <div className="mb-6 border-b border-[#d5dbdb]" />
+              امضا فروشنده
+            </div>
+            <div />
+            <div>
+              <div className="mb-6 border-b border-[#d5dbdb]" />
+              امضا خریدار
+            </div>
+          </div>
+
+          {/* Footer */}
+          <p className="mt-8 text-center text-[10px] text-[#879596]">
+            این فاکتور توسط سیستم حسابداری صادر شده است.
+          </p>
+        </div>
+      </div>
+    </>
+  );
+}

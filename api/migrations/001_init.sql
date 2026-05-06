@@ -1,0 +1,108 @@
+-- Users
+CREATE TABLE IF NOT EXISTS users (
+  id CHAR(36) PRIMARY KEY,
+  full_name VARCHAR(255) NOT NULL,
+  username VARCHAR(64) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('admin','manager','staff') NOT NULL DEFAULT 'staff',
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY ux_users_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Products
+CREATE TABLE IF NOT EXISTS products (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS product_attributes (
+  id CHAR(36) PRIMARY KEY,
+  product_id CHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY ix_attr_product (product_id),
+  CONSTRAINT fk_attr_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS attribute_options (
+  id CHAR(36) PRIMARY KEY,
+  attribute_id CHAR(36) NOT NULL,
+  label VARCHAR(255) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY ix_opt_attr (attribute_id),
+  CONSTRAINT fk_opt_attr FOREIGN KEY (attribute_id) REFERENCES product_attributes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS product_variants (
+  id CHAR(36) PRIMARY KEY,
+  product_id CHAR(36) NOT NULL,
+  sku VARCHAR(64) NOT NULL DEFAULT '',
+  price BIGINT NOT NULL DEFAULT 0,
+  sale_price BIGINT NOT NULL DEFAULT 0,
+  quantity INT NOT NULL DEFAULT 0,
+  attribute_values JSON NOT NULL, -- map attribute_id -> option label
+  image MEDIUMTEXT NULL, -- base64 thumbnail
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY ix_var_product (product_id),
+  CONSTRAINT fk_var_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Customers
+CREATE TABLE IF NOT EXISTS customers (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  phone VARCHAR(64) NOT NULL DEFAULT '',
+  address TEXT NOT NULL,
+  notes TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY ix_customers_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Invoices
+CREATE TABLE IF NOT EXISTS invoices (
+  id CHAR(36) PRIMARY KEY,
+  number VARCHAR(64) NOT NULL,
+  date DATE NOT NULL,
+  customer_id CHAR(36) NOT NULL DEFAULT '',
+  customer_name VARCHAR(255) NOT NULL DEFAULT '',
+  customer_phone VARCHAR(64) NOT NULL DEFAULT '',
+  customer_address TEXT NOT NULL,
+  notes TEXT NOT NULL,
+  discount BIGINT NOT NULL DEFAULT 0,
+  subtotal BIGINT NOT NULL DEFAULT 0,
+  total BIGINT NOT NULL DEFAULT 0,
+  status ENUM('draft','confirmed') NOT NULL DEFAULT 'draft',
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY ux_invoice_number (number),
+  KEY ix_invoice_date (date),
+  KEY ix_invoice_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS invoice_items (
+  id CHAR(36) PRIMARY KEY,
+  invoice_id CHAR(36) NOT NULL,
+  product_id CHAR(36) NOT NULL DEFAULT '',
+  variant_id CHAR(36) NOT NULL DEFAULT '',
+  product_name VARCHAR(255) NOT NULL,
+  variant_label VARCHAR(255) NOT NULL DEFAULT '',
+  sku VARCHAR(64) NOT NULL DEFAULT '',
+  unit_price BIGINT NOT NULL DEFAULT 0,
+  quantity INT NOT NULL DEFAULT 1,
+  total BIGINT NOT NULL DEFAULT 0,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY ix_items_invoice (invoice_id),
+  CONSTRAINT fk_items_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
