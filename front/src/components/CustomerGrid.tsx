@@ -61,14 +61,54 @@ const ActionCellRenderer = ({ data, context }: ICellRendererParams) => {
 };
 
 const COLUMN_DEFS: ColDef<Customer>[] = [
-  { field: "name", headerName: "نام", editable: true, flex: 1.5, minWidth: 140, filter: "agTextColumnFilter" },
-  { field: "phone", headerName: "تلفن", editable: true, flex: 1, minWidth: 120, filter: "agTextColumnFilter" },
-  { field: "address", headerName: "آدرس", editable: true, flex: 2, minWidth: 160, filter: "agTextColumnFilter" },
-  { field: "notes", headerName: "یادداشت", editable: true, flex: 1.5, minWidth: 140, filter: "agTextColumnFilter" },
-  { headerName: "عملیات", cellRenderer: ActionCellRenderer, sortable: false, filter: false, width: 90, editable: false, resizable: false },
+  {
+    field: "name",
+    headerName: "نام",
+    editable: true,
+    flex: 1.5,
+    minWidth: 140,
+    filter: "agTextColumnFilter",
+  },
+  {
+    field: "phone",
+    headerName: "تلفن",
+    editable: true,
+    flex: 1,
+    minWidth: 120,
+    filter: "agTextColumnFilter",
+  },
+  {
+    field: "address",
+    headerName: "آدرس",
+    editable: true,
+    flex: 2,
+    minWidth: 160,
+    filter: "agTextColumnFilter",
+  },
+  {
+    field: "notes",
+    headerName: "یادداشت",
+    editable: true,
+    flex: 1.5,
+    minWidth: 140,
+    filter: "agTextColumnFilter",
+  },
+  {
+    headerName: "عملیات",
+    cellRenderer: ActionCellRenderer,
+    sortable: false,
+    filter: false,
+    width: 90,
+    editable: false,
+    resizable: false,
+  },
 ];
 
-const DEFAULT_COL_DEF: ColDef<Customer> = { sortable: true, resizable: true, filter: true };
+const DEFAULT_COL_DEF: ColDef<Customer> = {
+  sortable: true,
+  resizable: true,
+  filter: true,
+};
 
 export default function CustomerGrid() {
   const gridRef = useRef<GridRef>(null);
@@ -82,8 +122,9 @@ export default function CustomerGrid() {
   useEffect(() => {
     const load = async () => {
       const cs = await getCustomers();
-      dataRef.current = cs;
-      setRowData(cs);
+      const arr = Array.isArray(cs) ? cs : [];
+      dataRef.current = arr;
+      setRowData(arr);
     };
     void load();
   }, []);
@@ -94,16 +135,25 @@ export default function CustomerGrid() {
     setRowData([...next]);
   }, []);
 
-  const cleanupEmpty = useCallback((id: string) => {
-    const c = dataRef.current.find((x) => x.id === id);
-    if (c && !c.name.trim()) {
-      void deleteCustomer(id);
-      commit(dataRef.current.filter((x) => x.id !== id));
-    }
-  }, [commit]);
+  const cleanupEmpty = useCallback(
+    (id: string) => {
+      const c = dataRef.current.find((x) => x.id === id);
+      if (c && !c.name.trim()) {
+        void deleteCustomer(id);
+        commit(dataRef.current.filter((x) => x.id !== id));
+      }
+    },
+    [commit],
+  );
 
   const handleAddRow = useCallback(() => {
-    const fresh: Customer = { id: crypto.randomUUID(), name: "", phone: "", address: "", notes: "" };
+    const fresh: Customer = {
+      id: crypto.randomUUID(),
+      name: "",
+      phone: "",
+      address: "",
+      notes: "",
+    };
     const next = [fresh, ...dataRef.current];
     commit(next);
     setTimeout(() => {
@@ -111,46 +161,72 @@ export default function CustomerGrid() {
     }, 80);
   }, [commit]);
 
-  const handleDelete = useCallback((id: string) => {
-    if (!window.confirm("آیا از حذف این مشتری مطمئن هستید؟")) return;
-    void deleteCustomer(id);
-    commit(dataRef.current.filter((c) => c.id !== id));
-  }, [commit]);
+  const handleDelete = useCallback(
+    (id: string) => {
+      if (!window.confirm("آیا از حذف این مشتری مطمئن هستید؟")) return;
+      void deleteCustomer(id);
+      commit(dataRef.current.filter((c) => c.id !== id));
+    },
+    [commit],
+  );
 
   const handleDeleteSelected = useCallback(async () => {
     const api = gridRef.current?.api;
     if (!api) return;
     const selected = api.getSelectedRows() as Customer[];
-    if (!selected.length) { alert("ابتدا ردیف‌هایی را انتخاب کنید."); return; }
+    if (!selected.length) {
+      alert("ابتدا ردیف‌هایی را انتخاب کنید.");
+      return;
+    }
     if (!window.confirm(`حذف ${selected.length} مشتری؟`)) return;
     const ids = new Set(selected.map((r) => r.id));
     await Promise.all(Array.from(ids).map((id) => deleteCustomer(id)));
     commit(dataRef.current.filter((c) => !ids.has(c.id)));
   }, [commit]);
 
-  const onCellValueChanged = useCallback((e: CellValueChangedEvent<Customer>) => {
-    const updated = { ...e.data } as Customer;
-    commit(dataRef.current.map((c) => (c.id === updated.id ? updated : c)));
-  }, [commit]);
+  const onCellValueChanged = useCallback(
+    (e: CellValueChangedEvent<Customer>) => {
+      const updated = { ...e.data } as Customer;
+      commit(dataRef.current.map((c) => (c.id === updated.id ? updated : c)));
+    },
+    [commit],
+  );
 
-  const onCellFocused = useCallback((e: CellFocusedEvent) => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
-    const newId = e.rowIndex !== null && e.rowIndex !== undefined
-      ? (api.getDisplayedRowAtIndex(e.rowIndex)?.data as Customer | undefined)?.id ?? null
-      : null;
-    const prevId = lastFocusedRef.current;
-    lastFocusedRef.current = newId;
-    if (prevId && prevId !== newId) cleanupEmpty(prevId);
-  }, [cleanupEmpty]);
+  const onCellFocused = useCallback(
+    (e: CellFocusedEvent) => {
+      const api = gridRef.current?.api;
+      if (!api) return;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      const newId =
+        e.rowIndex !== null && e.rowIndex !== undefined
+          ? ((
+              api.getDisplayedRowAtIndex(e.rowIndex)?.data as
+                | Customer
+                | undefined
+            )?.id ?? null)
+          : null;
+      const prevId = lastFocusedRef.current;
+      lastFocusedRef.current = newId;
+      if (prevId && prevId !== newId) cleanupEmpty(prevId);
+    },
+    [cleanupEmpty],
+  );
 
-  const onCellEditingStopped = useCallback((e: CellEditingStoppedEvent<Customer>) => {
-    const id = (e.data as Customer | undefined)?.id;
-    if (!id) return;
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => { timerRef.current = null; cleanupEmpty(id); }, 200);
-  }, [cleanupEmpty]);
+  const onCellEditingStopped = useCallback(
+    (e: CellEditingStoppedEvent<Customer>) => {
+      const id = (e.data as Customer | undefined)?.id;
+      if (!id) return;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        cleanupEmpty(id);
+      }, 200);
+    },
+    [cleanupEmpty],
+  );
 
   const getRowId = useCallback((p: GetRowIdParams<Customer>) => p.data.id, []);
 
@@ -159,43 +235,69 @@ export default function CustomerGrid() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-[#16191f]">مشتریان</h1>
-          <p className="mt-0.5 text-sm text-[#545b64]">برای ویرایش روی سلول کلیک کنید</p>
+          <p className="mt-0.5 text-sm text-[#545b64]">
+            برای ویرایش روی سلول کلیک کنید
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
-            type="search" placeholder="جستجو…" value={quickFilter}
+            type="search"
+            placeholder="جستجو…"
+            value={quickFilter}
             onChange={(e) => setQuickFilter(e.target.value)}
             className="w-44 rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm text-[#16191f] placeholder:text-[#879596] outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]"
           />
-          <button onClick={handleAddRow}
-            className="rounded bg-[#ec7211] px-4 py-2 text-sm font-medium text-white hover:bg-[#eb5f07] transition">
+          <button
+            onClick={handleAddRow}
+            className="rounded bg-[#ec7211] px-4 py-2 text-sm font-medium text-white hover:bg-[#eb5f07] transition"
+          >
             + مشتری جدید
           </button>
-          <button onClick={() => void handleDeleteSelected()} disabled={selectedCount === 0}
-            className="rounded border border-[#d13212] bg-white px-4 py-2 text-sm font-medium text-[#d13212] hover:bg-[#fdf3f1] disabled:cursor-not-allowed disabled:opacity-40 transition">
-            {selectedCount > 0 ? `حذف ${selectedCount} انتخاب‌شده` : "حذف انتخاب‌شده‌ها"}
+          <button
+            onClick={() => void handleDeleteSelected()}
+            disabled={selectedCount === 0}
+            className="rounded border border-[#d13212] bg-white px-4 py-2 text-sm font-medium text-[#d13212] hover:bg-[#fdf3f1] disabled:cursor-not-allowed disabled:opacity-40 transition"
+          >
+            {selectedCount > 0
+              ? `حذف ${selectedCount} انتخاب‌شده`
+              : "حذف انتخاب‌شده‌ها"}
           </button>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded border border-[#d5dbdb] shadow-sm" style={{ height: 520 }}>
+      <div
+        className="overflow-hidden rounded border border-[#d5dbdb] shadow-sm"
+        style={{ height: 520 }}
+      >
         <AgGridReact<Customer>
-          ref={gridRef} theme={gridTheme} rowData={rowData}
-          columnDefs={COLUMN_DEFS} defaultColDef={DEFAULT_COL_DEF}
+          ref={gridRef}
+          theme={gridTheme}
+          rowData={rowData}
+          columnDefs={COLUMN_DEFS}
+          defaultColDef={DEFAULT_COL_DEF}
           getRowId={getRowId}
           onCellValueChanged={onCellValueChanged}
           onCellFocused={onCellFocused}
           onCellEditingStopped={onCellEditingStopped}
           rowSelection="multiple"
-          onSelectionChanged={() => setSelectedCount(gridRef.current?.api?.getSelectedRows()?.length ?? 0)}
+          onSelectionChanged={() =>
+            setSelectedCount(
+              gridRef.current?.api?.getSelectedRows()?.length ?? 0,
+            )
+          }
           quickFilterText={quickFilter}
-          enableRtl={true} pagination={true} paginationPageSize={20}
+          enableRtl={true}
+          pagination={true}
+          paginationPageSize={20}
           animateRows={true}
           context={{ handleDelete } satisfies GridCtx}
           noRowsOverlayComponent={NoRowsOverlay}
         />
       </div>
-      <p className="text-xs text-[#879596]">{rowData.length} مشتری ثبت‌شده{selectedCount > 0 && ` · ${selectedCount} انتخاب‌شده`}</p>
+      <p className="text-xs text-[#879596]">
+        {rowData.length} مشتری ثبت‌شده
+        {selectedCount > 0 && ` · ${selectedCount} انتخاب‌شده`}
+      </p>
     </div>
   );
 }

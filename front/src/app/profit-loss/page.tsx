@@ -382,7 +382,8 @@ export default function ProfitLossPage() {
               سبز = سودده &nbsp;·&nbsp; قرمز = زیان‌ده
             </p>
           </div>
-          <div className="p-5" style={{ height: 260 }}>
+          <div className="p-5">
+          <div style={{ width: "100%", height: 260 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={chartData}
@@ -432,6 +433,7 @@ export default function ProfitLossPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </div>
         </div>
       )}

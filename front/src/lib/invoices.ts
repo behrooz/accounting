@@ -1,4 +1,23 @@
 import { apiRequest } from "@/lib/api";
+
+const KEY = "accounting-invoices";
+
+const localGetInvoices = (): Invoice[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const localSaveInvoices = (invoices: Invoice[]) => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(KEY, JSON.stringify(invoices));
+};
 /* ─────────────────────────────────────────────────────────────────────────
    Invoice — types + localStorage helpers
 ──────────────────────────────────────────────────────────────────────────── */
@@ -41,10 +60,8 @@ export type Invoice = {
 
 /* ─── helpers ─────────────────────────────────────────────────────────── */
 
-export const computeItemTotal = (
-  unitPrice: number,
-  quantity: number,
-): number => Math.round(unitPrice * quantity);
+export const computeItemTotal = (unitPrice: number, quantity: number): number =>
+  Math.round(unitPrice * quantity);
 
 export const computeInvoiceTotals = (
   items: InvoiceItem[],
@@ -56,24 +73,42 @@ export const computeInvoiceTotals = (
 
 /** Sequential invoice number based on existing count */
 export const nextInvoiceNumber = async (): Promise<string> => {
-  const response = await apiRequest<{ number: string }>("/invoices/next-number");
-  return response.number;
+  try {
+    const response = await apiRequest<{ number: string }>(
+      "/invoices/next-number",
+    );
+    return response.number;
+  } catch {
+    // fallback to local count
+    const n = localGetInvoices().length + 1;
+    return `INV-${String(n).padStart(4, "0")}`;
+  }
 };
 
 /* ─── localStorage ────────────────────────────────────────────────────── */
 
-export const getInvoices = async (): Promise<Invoice[]> =>
-  apiRequest<Invoice[]>("/invoices");
+export const getInvoices = async (): Promise<Invoice[]> => {
+  try {
+    return await apiRequest<Invoice[]>("/invoices");
+  } catch {
+    return localGetInvoices();
+  }
+};
 
 export const saveInvoices = async (invoices: Invoice[]): Promise<void> => {
-  await Promise.all(
-    invoices.map((invoice) =>
-      apiRequest(`/invoices/${invoice.id}`, {
-        method: "PUT",
-        body: JSON.stringify(invoice),
-      }),
-    ),
-  );
+  try {
+    await Promise.all(
+      invoices.map((invoice) =>
+        apiRequest(`/invoices/${invoice.id}`, {
+          method: "PUT",
+          body: JSON.stringify(invoice),
+        }),
+      ),
+    );
+  } catch {
+    // fallback to localStorage
+    localSaveInvoices(invoices);
+  }
 };
 
 export const getInvoiceById = async (
@@ -82,17 +117,30 @@ export const getInvoiceById = async (
   try {
     return await apiRequest<Invoice>(`/invoices/${id}`);
   } catch {
-    return undefined;
+    return localGetInvoices().find((i) => i.id === id);
   }
 };
 
 export const saveInvoice = async (invoice: Invoice): Promise<void> => {
-  await apiRequest(`/invoices/${invoice.id}`, {
-    method: "PUT",
-    body: JSON.stringify(invoice),
-  });
+  try {
+    await apiRequest(`/invoices/${invoice.id}`, {
+      method: "PUT",
+      body: JSON.stringify(invoice),
+    });
+  } catch {
+    const all = localGetInvoices();
+    const idx = all.findIndex((i) => i.id === invoice.id);
+    if (idx >= 0) all[idx] = invoice;
+    else all.push(invoice);
+    localSaveInvoices(all);
+  }
 };
 
 export const deleteInvoice = async (id: string): Promise<void> => {
-  await apiRequest(`/invoices/${id}`, { method: "DELETE" });
+  try {
+    await apiRequest(`/invoices/${id}`, { method: "DELETE" });
+  } catch {
+    const all = localGetInvoices().filter((i) => i.id !== id);
+    localSaveInvoices(all);
+  }
 };

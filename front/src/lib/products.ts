@@ -1,4 +1,23 @@
 import { apiRequest } from "@/lib/api";
+
+const KEY = "accounting-products";
+
+const localGetProducts = (): Product[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const localSaveProducts = (products: Product[]) => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(KEY, JSON.stringify(products));
+};
 /* ─────────────────────────────────────────────────────────────────────────
    Types
 ──────────────────────────────────────────────────────────────────────────── */
@@ -120,35 +139,59 @@ export const mergeVariants = (
    localStorage persistence
 ──────────────────────────────────────────────────────────────────────────── */
 
-export const getProducts = async (): Promise<Product[]> =>
-  apiRequest<Product[]>("/products");
-
-export const saveProducts = async (products: Product[]): Promise<void> => {
-  await Promise.all(
-    products.map((product) =>
-      apiRequest(`/products/${product.id}`, {
-        method: "PUT",
-        body: JSON.stringify(product),
-      }),
-    ),
-  );
+export const getProducts = async (): Promise<Product[]> => {
+  try {
+    return await apiRequest<Product[]>("/products");
+  } catch {
+    return localGetProducts();
+  }
 };
 
-export const getProductById = async (id: string): Promise<Product | undefined> => {
+export const saveProducts = async (products: Product[]): Promise<void> => {
+  try {
+    await Promise.all(
+      products.map((product) =>
+        apiRequest(`/products/${product.id}`, {
+          method: "PUT",
+          body: JSON.stringify(product),
+        }),
+      ),
+    );
+  } catch {
+    localSaveProducts(products);
+  }
+};
+
+export const getProductById = async (
+  id: string,
+): Promise<Product | undefined> => {
   try {
     return await apiRequest<Product>(`/products/${id}`);
   } catch {
-    return undefined;
+    return localGetProducts().find((p) => p.id === id);
   }
 };
 
 export const saveProduct = async (product: Product): Promise<void> => {
-  await apiRequest(`/products/${product.id}`, {
-    method: "PUT",
-    body: JSON.stringify(product),
-  });
+  try {
+    await apiRequest(`/products/${product.id}`, {
+      method: "PUT",
+      body: JSON.stringify(product),
+    });
+  } catch {
+    const all = localGetProducts();
+    const idx = all.findIndex((p) => p.id === product.id);
+    if (idx >= 0) all[idx] = product;
+    else all.push(product);
+    localSaveProducts(all);
+  }
 };
 
 export const deleteProduct = async (id: string): Promise<void> => {
-  await apiRequest(`/products/${id}`, { method: "DELETE" });
+  try {
+    await apiRequest(`/products/${id}`, { method: "DELETE" });
+  } catch {
+    const all = localGetProducts().filter((p) => p.id !== id);
+    localSaveProducts(all);
+  }
 };
