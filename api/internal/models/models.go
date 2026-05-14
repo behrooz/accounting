@@ -78,4 +78,5 @@ type InvoiceItem struct {
 	UnitPrice    int64  `json:"unitPrice"`
 	Quantity     int    `json:"quantity"`
 	Total        int64  `json:"total"`
+	CreatedAt       string        `json:"createdAt"`
 }

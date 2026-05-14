@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"accounting-api/internal/models"
+
 	"github.com/jmoiron/sqlx"
 )
 
@@ -22,6 +23,7 @@ type invoiceRow struct {
 	Total           int64  `db:"total"`
 	Status          string `db:"status"`
 	CreatedAt       string `db:"created_at"`
+	UpdatedAt       string `db:"updated_at"`
 }
 
 type itemRow struct {
@@ -36,6 +38,8 @@ type itemRow struct {
 	Quantity     int    `db:"quantity"`
 	Total        int64  `db:"total"`
 	SortOrder    int    `db:"sort_order"`
+	CreatedAt    string `db:"created_at"`
+	UpdatedAt    string `db:"updated_at"`
 }
 
 func ListInvoices(db *sqlx.DB) ([]models.Invoice, error) {
@@ -137,12 +141,20 @@ func fmtInt(n int) string {
 
 func UpsertInvoice(db *sqlx.DB, inv models.Invoice) error {
 	return WithTx(db, func(tx *sqlx.Tx) error {
-		createdAt := inv.CreatedAt
+		//:= inv.CreatedAt
+
+		t, err := time.Parse(time.RFC3339, inv.CreatedAt)
+		if err != nil {
+			return err
+		}
+
+		createdAt := t.Format("2006-01-02 15:04:05.00")
+
 		if createdAt == "" {
 			createdAt = time.Now().Format(time.RFC3339)
 		}
 
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			`INSERT INTO invoices(
 				id, number, date, customer_id, customer_name, customer_phone, customer_address,
 				notes, discount, subtotal, total, status, created_at
