@@ -692,7 +692,7 @@ export default function InvoiceEditor({ initialInvoice, isNew = true }: Props) {
                 </tbody>
                 </table>
               </div>
-            </div>
+            
           )}
 
         {/* ── Totals bar ─────────────────────────────────────────── */}
