@@ -16,8 +16,8 @@ type User struct {
 type Product struct {
 	ID         string             `json:"id"`
 	Name       string             `json:"name"`
-	Attributes []ProductAttribute  `json:"attributes"`
-	Variants   []ProductVariant    `json:"variants"`
+	Attributes []ProductAttribute `json:"attributes"`
+	Variants   []ProductVariant   `json:"variants"`
 }
 
 type ProductAttribute struct {
@@ -78,5 +78,5 @@ type InvoiceItem struct {
 	UnitPrice    int64  `json:"unitPrice"`
 	Quantity     int    `json:"quantity"`
 	Total        int64  `json:"total"`
-	CreatedAt       string        `json:"createdAt"`
+	CreatedAt    string `json:"createdAt"`
 }
