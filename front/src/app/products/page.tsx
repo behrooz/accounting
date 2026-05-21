@@ -36,10 +36,7 @@ export default function ProductsPage() {
           <p className="mt-1 text-sm text-[#545b64]">نمایش کارتی همه محصولات</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => void load()}
-            className="rounded border border-[#aab7b8] bg-white px-4 py-2 text-sm font-medium text-[#16191f] hover:bg-[#f2f3f3] transition"
-          >
+          <button className="rounded border border-[#aab7b8] bg-white px-4 py-2 text-sm font-medium text-[#16191f] hover:bg-[#f2f3f3] transition">
             بروزرسانی
           </button>
           <Link
