@@ -12,9 +12,19 @@ import {
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
 
-  const load = async () => setProducts(await getProducts());
+  const refresh = async () => setProducts(await getProducts());
+
   useEffect(() => {
-    void load();
+    let mounted = true;
+    (async () => {
+      const ps = await getProducts();
+      if (!mounted) return;
+      // apply state change asynchronously to avoid cascading renders warning
+      setTimeout(() => setProducts(ps), 0);
+    })();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (

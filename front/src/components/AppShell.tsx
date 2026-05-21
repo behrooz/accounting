@@ -9,7 +9,7 @@ type Props = {
   children: ReactNode;
 };
 
-const PUBLIC_ROUTES = ["/login"];
+const PUBLIC_ROUTE_PREFIXES = ["/login", "/shop"];
 
 export default function AppShell({ children }: Props) {
   const pathname = usePathname();
@@ -17,7 +17,10 @@ export default function AppShell({ children }: Props) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const isPublic = PUBLIC_ROUTES.includes(pathname);
+    const p = pathname ?? "/";
+    const isPublic = PUBLIC_ROUTE_PREFIXES.some((prefix) =>
+      p.startsWith(prefix),
+    );
     const session = getSessionUser();
 
     if (!session && !isPublic) {
@@ -25,28 +28,40 @@ export default function AppShell({ children }: Props) {
       return;
     }
 
-    if (session && pathname === "/login") {
+    if (session && p === "/login") {
       router.replace("/dashboard");
       return;
     }
 
-    setReady(true);
+    // schedule ready state asynchronously to avoid synchronous setState within the effect
+    setTimeout(() => setReady(true), 0);
   }, [pathname, router]);
 
-  const isPublic = PUBLIC_ROUTES.includes(pathname);
+  const p = pathname ?? "/";
+  const isPublic = PUBLIC_ROUTE_PREFIXES.some((prefix) => p.startsWith(prefix));
 
   if (!ready) {
-    return <div className="flex min-h-screen items-center justify-center text-[#545b64]">در حال بارگذاری...</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center text-[#545b64]">
+        در حال بارگذاری...
+      </div>
+    );
   }
 
   if (isPublic) {
-    return <main className="flex min-h-screen flex-1 flex-col overflow-auto">{children}</main>;
+    return (
+      <main className="flex min-h-screen flex-1 flex-col overflow-auto">
+        {children}
+      </main>
+    );
   }
 
   return (
     <>
       <Sidebar />
-      <main className="flex min-h-screen flex-1 flex-col overflow-auto">{children}</main>
+      <main className="flex min-h-screen flex-1 flex-col overflow-auto">
+        {children}
+      </main>
     </>
   );
 }

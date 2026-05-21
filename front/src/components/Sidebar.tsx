@@ -10,6 +10,7 @@ const NAV = [
     section: "اصلی",
     items: [
       { label: "داشبورد", href: "/dashboard" },
+      { label: "فروشگاه", href: "/shop" },
       { label: "مدیریت محصولات", href: "/products/manage" },
       { label: "کاربران", href: "/users" },
       { label: "سود و زیان", href: "/profit-loss" },

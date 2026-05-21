@@ -9,7 +9,15 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${fileDirname}"            
+            "program": "${fileDirname}",
+            "envFile": "${workspaceFolder}/.env",
+            "env" :{
+                "APP_ENV": "dev",
+                "APP_PORT": "8080",
+                "APP_CORS_ORIGIN": "http://localhost:3000",
+                "MYSQL_DSN": "accounting:accounting@tcp(localhost:3306)/accounting?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci&multiStatements=true",
+                "JWT_SECRET": "change-me-in-production"
+            }       
         }
     ]
     
