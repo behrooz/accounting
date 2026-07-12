@@ -1,0 +1,6 @@
+.env
+.git
+.vscode
+docker-compose.yml
+README.md
+**/*_test.go
