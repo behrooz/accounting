@@ -1,9 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: accounting-api
+  repository: 188.132.232.168:30836/accounting-api
   pullPolicy: IfNotPresent
-  tag: "0.1.0"
+  tag: "1"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -59,7 +59,13 @@ httpRoute:
             type: PathPrefix
             value: /
 
-resources: {}
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "500m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
 
 livenessProbe:
   httpGet:
@@ -92,7 +98,7 @@ affinity: {}
 config:
   APP_ENV: prod
   APP_PORT: "8080"
-  APP_CORS_ORIGIN: http://front.accounting.local
+  APP_CORS_ORIGIN: https://ns-xp45-default-accounting-front.bugx.ir
   TZ: Asia/Tehran
 
 # Sensitive values (Secret). Override via --set or a values file; do not commit real secrets.
@@ -100,5 +106,5 @@ secret:
   create: true
   # Use an existing Secret instead of creating one from values
   existingSecret: ""
-  MYSQL_DSN: "accounting:accounting@tcp(mysql:3306)/accounting?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci"
+  MYSQL_DSN: "root:secret123@tcp(mysql-headless:3306)/accounting?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci"
   JWT_SECRET: "change-me-in-production"

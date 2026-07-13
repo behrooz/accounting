@@ -22,6 +22,10 @@ import (
 func main() {
 	cfg := config.Load()
 
+	if err := db.EnsureDatabase(context.Background(), cfg.MySQLDSN); err != nil {
+		panic(err)
+	}
+
 	database, err := db.Open(cfg.MySQLDSN)
 	if err != nil {
 		panic(err)

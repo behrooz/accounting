@@ -1,9 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: accounting-front
+  repository: 188.132.232.168:30836/accounting-front
   pullPolicy: IfNotPresent
-  tag: "0.1.0"
+  tag: "1"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -58,7 +58,13 @@ httpRoute:
             type: PathPrefix
             value: /
 
-resources: {}
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "256Mi"
+    cpu: "200m"
 
 livenessProbe:
   httpGet:
