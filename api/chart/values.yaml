@@ -106,5 +106,5 @@ secret:
   create: true
   # Use an existing Secret instead of creating one from values
   existingSecret: ""
-  MYSQL_DSN: "root:secret123@tcp(mysql-headless:3306)/accounting?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci"
+  MYSQL_DSN: "root:secret123@tcp(mysql-headless:3306)/accounting?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci&multiStatements=true"
   JWT_SECRET: "change-me-in-production"

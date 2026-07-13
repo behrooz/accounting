@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -55,8 +56,10 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 			return fmt.Errorf("empty migration: %s", f)
 		}
 
-		if _, err := db.Exec(sqlText); err != nil {
-			return fmt.Errorf("migration %s failed: %w", f, err)
+		for i, stmt := range splitStatements(sqlText) {
+			if _, err := db.Exec(stmt); err != nil {
+				return fmt.Errorf("migration %s statement %d failed: %w", f, i+1, err)
+			}
 		}
 		if _, err := db.Exec("INSERT INTO schema_migrations(filename) VALUES(?)", f); err != nil {
 			return err
@@ -64,4 +67,107 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 	}
 
 	return nil
+}
+
+// splitStatements splits SQL into individual statements without needing multiStatements=true.
+func splitStatements(sqlText string) []string {
+	var (
+		stmts   []string
+		buf     strings.Builder
+		inSingle bool
+		inBacktick bool
+		inLineComment bool
+		inBlockComment bool
+	)
+
+	runes := []rune(sqlText)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		next := func() rune {
+			if i+1 < len(runes) {
+				return runes[i+1]
+			}
+			return 0
+		}
+
+		if inLineComment {
+			if r == '\n' {
+				inLineComment = false
+				buf.WriteRune(r)
+			}
+			continue
+		}
+		if inBlockComment {
+			if r == '*' && next() == '/' {
+				inBlockComment = false
+				i++
+			}
+			continue
+		}
+
+		if !inSingle && !inBacktick {
+			if r == '-' && next() == '-' {
+				inLineComment = true
+				i++
+				continue
+			}
+			if r == '#' {
+				inLineComment = true
+				continue
+			}
+			if r == '/' && next() == '*' {
+				inBlockComment = true
+				i++
+				continue
+			}
+		}
+
+		if r == '\'' && !inBacktick {
+			if inSingle {
+				// escaped '' inside string
+				if next() == '\'' {
+					buf.WriteRune(r)
+					buf.WriteRune(next())
+					i++
+					continue
+				}
+				inSingle = false
+			} else {
+				inSingle = true
+			}
+			buf.WriteRune(r)
+			continue
+		}
+
+		if r == '`' && !inSingle {
+			inBacktick = !inBacktick
+			buf.WriteRune(r)
+			continue
+		}
+
+		if r == ';' && !inSingle && !inBacktick {
+			stmt := strings.TrimSpace(buf.String())
+			if stmt != "" && !onlyWhitespaceOrSemicolons(stmt) {
+				stmts = append(stmts, stmt)
+			}
+			buf.Reset()
+			continue
+		}
+
+		buf.WriteRune(r)
+	}
+
+	if stmt := strings.TrimSpace(buf.String()); stmt != "" {
+		stmts = append(stmts, stmt)
+	}
+	return stmts
+}
+
+func onlyWhitespaceOrSemicolons(s string) bool {
+	for _, r := range s {
+		if !unicode.IsSpace(r) && r != ';' {
+			return false
+		}
+	}
+	return true
 }
