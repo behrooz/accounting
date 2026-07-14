@@ -159,6 +159,17 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
       ),
     }));
 
+  const handleAttributeAllowImageChange = (
+    attrId: string,
+    allowImage: boolean,
+  ) =>
+    setProduct((p) => ({
+      ...p,
+      attributes: p.attributes.map((a) =>
+        a.id === attrId ? { ...a, allowImage } : a,
+      ),
+    }));
+
   const handleAddOption = (attrId: string, label: string) => {
     setProduct((p) => {
       const newAttrs = p.attributes.map((a) =>
@@ -214,6 +225,7 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
       alert("نام محصول را وارد کنید.");
       return;
     }
+    const allowVariantImages = product.attributes.some((a) => a.allowImage);
     await saveProduct({
       ...product,
       name: trimmed,
@@ -223,6 +235,12 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
         ...a,
         allowImage: !!a.allowImage,
       })),
+      variants: allowVariantImages
+        ? product.variants
+        : product.variants.map((v) => {
+            const { image: _image, ...rest } = v;
+            return rest;
+          }),
     });
     router.push("/products/manage");
   };
@@ -387,7 +405,7 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
             <h2 className="text-sm font-semibold text-[#16191f]">ویژگی‌ها</h2>
             <p className="mt-0.5 text-xs text-[#545b64]">
               هر ویژگی (مثلاً رنگ یا سایز) گزینه‌هایی دارد که ترکیب‌ها را
-              می‌سازند.
+              می‌سازند. برای ویژگی‌هایی مثل رنگ، «آپلود تصویر» را روشن کنید.
             </p>
           </div>
           <button
@@ -443,6 +461,36 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
                     />
                   </div>
 
+                  <label
+                    className="flex shrink-0 cursor-pointer items-center gap-2 rounded border border-[#d5dbdb] bg-white px-2.5 py-1.5 text-xs text-[#545b64]"
+                    title="وقتی روشن باشد، می‌توانید برای ترکیب‌های این ویژگی تصویر بگذارید"
+                  >
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={!!attr.allowImage}
+                      onChange={(e) =>
+                        handleAttributeAllowImageChange(
+                          attr.id,
+                          e.target.checked,
+                        )
+                      }
+                    />
+                    <span
+                      aria-hidden
+                      className={`relative h-5 w-9 rounded-full transition ${
+                        attr.allowImage ? "bg-[#0073bb]" : "bg-[#aab7b8]"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${
+                          attr.allowImage ? "right-0.5" : "left-0.5"
+                        }`}
+                      />
+                    </span>
+                    <span>آپلود تصویر</span>
+                  </label>
+
                   <button
                     type="button"
                     onClick={() => handleRemoveAttribute(attr.id)}
@@ -464,6 +512,9 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
           </h2>
           <p className="mt-0.5 text-xs text-[#545b64]">
             قیمت، کد و موجودی هر ترکیب را مستقیم در جدول ویرایش کنید.
+            {product.attributes.some((a) => a.allowImage)
+              ? " ستون تصویر وقتی حداقل یک ویژگی «آپلود تصویر» داشته باشد نمایش داده می‌شود."
+              : ""}
           </p>
         </div>
         <div className="p-5">
