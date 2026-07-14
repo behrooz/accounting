@@ -57,6 +57,24 @@ func main() {
 
 	api := r.Group("/api")
 
+	// Public categories (storefront)
+	api.GET("/categories", func(c *gin.Context) {
+		rows, err := repo.ListCategories(database)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		c.JSON(http.StatusOK, rows)
+	})
+	api.GET("/categories/:id", func(c *gin.Context) {
+		row, err := repo.GetCategory(database, c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.JSON(http.StatusOK, row)
+	})
+
 	// Auth
 	api.POST("/auth/login", func(c *gin.Context) {
 		var body struct {
@@ -195,6 +213,37 @@ func main() {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
 		}
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	// Categories (admin write — list/get are public above)
+	authed.POST("/categories", func(c *gin.Context) {
+		var body models.ProductCategory
+		if err := c.ShouldBindJSON(&body); err != nil || body.ID == "" || body.Name == "" || body.Slug == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		if err := repo.UpsertCategory(database, body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"ok": true})
+	})
+	authed.PUT("/categories/:id", func(c *gin.Context) {
+		var body models.ProductCategory
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		body.ID = c.Param("id")
+		if err := repo.UpsertCategory(database, body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+	authed.DELETE("/categories/:id", func(c *gin.Context) {
+		_ = repo.DeleteCategory(database, c.Param("id"))
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 

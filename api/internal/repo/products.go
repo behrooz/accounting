@@ -10,8 +10,9 @@ import (
 )
 
 type productRow struct {
-	ID   string `db:"id"`
-	Name string `db:"name"`
+	ID         string         `db:"id"`
+	Name       string         `db:"name"`
+	CategoryID sql.NullString `db:"category_id"`
 }
 
 type attrRow struct {
@@ -47,7 +48,7 @@ type varRow struct {
 
 func ListProducts(db *sqlx.DB) ([]models.Product, error) {
 	var ps []productRow
-	if err := db.Select(&ps, "SELECT id, name FROM products ORDER BY updated_at DESC"); err != nil {
+	if err := db.Select(&ps, "SELECT id, name, category_id FROM products ORDER BY updated_at DESC"); err != nil {
 		return nil, err
 	}
 	out := make([]models.Product, 0, len(ps))
@@ -63,7 +64,7 @@ func ListProducts(db *sqlx.DB) ([]models.Product, error) {
 
 func GetProduct(db *sqlx.DB, id string) (*models.Product, error) {
 	var p productRow
-	if err := db.Get(&p, "SELECT id, name FROM products WHERE id=? LIMIT 1", id); err != nil {
+	if err := db.Get(&p, "SELECT id, name, category_id FROM products WHERE id=? LIMIT 1", id); err != nil {
 		return nil, err
 	}
 
@@ -129,14 +130,27 @@ func GetProduct(db *sqlx.DB, id string) (*models.Product, error) {
 	return &models.Product{
 		ID:         p.ID,
 		Name:       p.Name,
+		CategoryID: nullStringPtr(p.CategoryID),
 		Attributes: fullAttrs,
 		Variants:   variants,
 	}, nil
 }
 
+func nullStringPtr(ns sql.NullString) *string {
+	if !ns.Valid || ns.String == "" {
+		return nil
+	}
+	s := ns.String
+	return &s
+}
+
 func UpsertProduct(db *sqlx.DB, p models.Product) error {
 	return WithTx(db, func(tx *sqlx.Tx) error {
-		_, err := tx.Exec(`INSERT INTO products(id, name) VALUES(?,?) ON DUPLICATE KEY UPDATE name=VALUES(name)`, p.ID, p.Name)
+		_, err := tx.Exec(
+			`INSERT INTO products(id, name, category_id) VALUES(?,?,?)
+			 ON DUPLICATE KEY UPDATE name=VALUES(name), category_id=VALUES(category_id)`,
+			p.ID, p.Name, p.CategoryID,
+		)
 		if err != nil {
 			return err
 		}

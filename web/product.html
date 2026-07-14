@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>محصول | آبرنگ</title>
+  <link href="https://fonts.cdnfonts.com/css/iranyekan" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="announcement">رنگبندی واقعی · ارسال از تهران</div>
+
+  <header class="site-header" id="siteHeader">
+    <div class="header-inner">
+      <button class="icon-btn menu-toggle" id="menuToggle" aria-label="منو" type="button">
+        <span></span><span></span><span></span>
+      </button>
+      <a class="brand" href="index.html">آبرنگ</a>
+      <nav class="main-nav" id="mainNav">
+        <a href="shop.html">فروشگاه</a>
+        <a href="shop.html#sale">حراج</a>
+        <a href="index.html#support">پشتیبانی</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn cart-btn" id="cartToggle" type="button" aria-label="سبد">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 7h12l-1 12H7L6 7z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 7a3 3 0 016 0" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          <span class="cart-count" id="cartCount">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="product-page" id="productPage">
+    <p class="loading-msg">در حال بارگذاری...</p>
+  </main>
+
+  <footer class="site-footer compact">
+    <p class="copyright">© ۱۴۰۵ آبرنگ</p>
+  </footer>
+
+  <aside class="cart-drawer" id="cartDrawer" aria-hidden="true">
+    <div class="cart-drawer-panel">
+      <div class="cart-drawer-head">
+        <span class="cart-head-spacer" aria-hidden="true"></span>
+        <h2>سبد خرید</h2>
+        <button type="button" class="cart-close-btn" id="cartClose" aria-label="بستن">
+          <span aria-hidden="true">×</span>
+          <span>بستن</span>
+        </button>
+      </div>
+      <div class="cart-items" id="cartItems"></div>
+      <div class="cart-footer">
+        <div class="cart-total">
+          <span>جمع جزء:</span>
+          <strong id="cartTotal">۰ تومان</strong>
+        </div>
+        <button type="button" class="btn-cart btn-cart-dark" id="cartContinue">ادامه خرید</button>
+        <a class="btn-cart btn-cart-outline" href="shop.html">مشاهده سبد</a>
+        <button type="button" class="btn-cart btn-cart-red" id="cartCheckout">ثبت سفارش</button>
+      </div>
+    </div>
+  </aside>
+  <div class="overlay" id="overlay" hidden></div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

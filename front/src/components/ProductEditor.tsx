@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   generateVariantCombinations,
@@ -10,6 +10,10 @@ import {
   type ProductAttribute,
   type ProductVariant,
 } from "@/lib/products";
+import {
+  getCategories,
+  type ProductCategory,
+} from "@/lib/categories";
 import VariantsGrid from "./VariantsGrid";
 
 /* ─── Small inline helper: tag-style option input ───────────────────────── */
@@ -50,6 +54,11 @@ type Props = {
 export default function ProductEditor({ initialProduct, isNew }: Props) {
   const router = useRouter();
   const [product, setProduct] = useState<Product>(initialProduct);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+
+  useEffect(() => {
+    void getCategories().then(setCategories);
+  }, []);
 
   const syncVariants = useCallback(
     (attrs: ProductAttribute[], current: ProductVariant[]): ProductVariant[] =>
@@ -60,6 +69,12 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
   /* ── Name ────────────────────────────────────────────────────────────── */
   const handleNameChange = (name: string) =>
     setProduct((p) => ({ ...p, name }));
+
+  const handleCategoryChange = (categoryId: string) =>
+    setProduct((p) => ({
+      ...p,
+      categoryId: categoryId || null,
+    }));
 
   /* ── Attributes ─────────────────────────────────────────────────────── */
   const handleAddAttribute = () => {
@@ -138,7 +153,11 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
       alert("نام محصول را وارد کنید.");
       return;
     }
-    await saveProduct({ ...product, name: trimmed });
+    await saveProduct({
+      ...product,
+      name: trimmed,
+      categoryId: product.categoryId || null,
+    });
     router.push("/products/manage");
   };
 
@@ -173,12 +192,14 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
         </div>
       </div>
 
-      {/* ── Product name ─────────────────────────────────────────────────── */}
+      {/* ── Product basics ───────────────────────────────────────────────── */}
       <section className="rounded border border-[#d5dbdb] bg-white shadow-sm">
         <div className="border-b border-[#d5dbdb] bg-[#f2f3f3] px-5 py-3">
-          <h2 className="text-sm font-semibold text-[#16191f]">نام محصول</h2>
+          <h2 className="text-sm font-semibold text-[#16191f]">
+            اطلاعات محصول
+          </h2>
         </div>
-        <div className="p-5">
+        <div className="grid gap-4 p-5 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-[#545b64]">نام</span>
             <input
@@ -187,6 +208,21 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
               placeholder="مثلاً: تی‌شرت پنبه‌ای"
               className="w-full rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm text-[#16191f] placeholder:text-[#879596] outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]"
             />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-[#545b64]">دسته‌بندی</span>
+            <select
+              value={product.categoryId ?? ""}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="w-full rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm text-[#16191f] outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]"
+            >
+              <option value="">— بدون دسته —</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
       </section>

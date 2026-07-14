@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>فروشگاه | آبرنگ</title>
+  <link href="https://fonts.cdnfonts.com/css/iranyekan" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="announcement">ارسال از تهران · عکس با نور طبیعی</div>
+
+  <header class="site-header" id="siteHeader">
+    <div class="header-inner">
+      <button class="icon-btn menu-toggle" id="menuToggle" aria-label="منو" type="button">
+        <span></span><span></span><span></span>
+      </button>
+      <a class="brand" href="index.html">آبرنگ</a>
+      <nav class="main-nav" id="mainNav" aria-label="اصلی">
+        <a href="shop.html" class="is-active">فروشگاه</a>
+        <a href="shop.html#sale">حراج</a>
+        <a href="shop.html?cat=sets">ست و کت‌شلوار</a>
+        <a href="shop.html?cat=dresses">پیراهن</a>
+        <a href="index.html#support">پشتیبانی</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn" id="searchToggle" aria-label="جستجو" type="button">
+          <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+        <button class="icon-btn cart-btn" id="cartToggle" aria-label="سبد خرید" type="button">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 7h12l-1 12H7L6 7z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 7a3 3 0 016 0" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          <span class="cart-count" id="cartCount">0</span>
+        </button>
+      </div>
+    </div>
+    <div class="search-bar" id="searchBar" hidden>
+      <form class="search-form" action="shop.html" method="get">
+        <input type="search" name="q" id="shopSearchInput" placeholder="جستجوی محصول..." />
+        <button type="submit">جستجو</button>
+      </form>
+    </div>
+  </header>
+
+  <main class="shop-page">
+    <div class="shop-toolbar">
+      <h1 id="shopTitle">فروشگاه</h1>
+      <div class="shop-filters">
+        <select id="catFilter" aria-label="دسته">
+          <option value="all">همه دسته‌ها</option>
+          <option value="blouse">شومیز و بلوز</option>
+          <option value="pants">شلوار و دامن</option>
+          <option value="dresses">پیراهن و سرهمی</option>
+          <option value="outer">کت و مانتو</option>
+          <option value="sets">ست</option>
+          <option value="accessories">اکسسوری</option>
+        </select>
+        <select id="sortFilter" aria-label="مرتب‌سازی">
+          <option value="new">جدیدترین</option>
+          <option value="price-asc">ارزان‌ترین</option>
+          <option value="price-desc">گران‌ترین</option>
+          <option value="sale">حراج</option>
+        </select>
+      </div>
+    </div>
+    <div class="product-grid" id="shopProducts"></div>
+    <p class="empty-state" id="shopEmpty" hidden>محصولی پیدا نشد.</p>
+  </main>
+
+  <footer class="site-footer compact">
+    <p class="copyright">© ۱۴۰۵ آبرنگ</p>
+  </footer>
+
+  <aside class="cart-drawer" id="cartDrawer" aria-hidden="true">
+    <div class="cart-drawer-panel">
+      <div class="cart-drawer-head">
+        <span class="cart-head-spacer" aria-hidden="true"></span>
+        <h2>سبد خرید</h2>
+        <button type="button" class="cart-close-btn" id="cartClose" aria-label="بستن">
+          <span aria-hidden="true">×</span>
+          <span>بستن</span>
+        </button>
+      </div>
+      <div class="cart-items" id="cartItems"></div>
+      <div class="cart-footer">
+        <div class="cart-total">
+          <span>جمع جزء:</span>
+          <strong id="cartTotal">۰ تومان</strong>
+        </div>
+        <button type="button" class="btn-cart btn-cart-dark" id="cartContinue">ادامه خرید</button>
+        <a class="btn-cart btn-cart-outline" href="shop.html">مشاهده سبد</a>
+        <button type="button" class="btn-cart btn-cart-red" id="cartCheckout">ثبت سفارش</button>
+      </div>
+    </div>
+  </aside>
+  <div class="overlay" id="overlay" hidden></div>
+
+  <nav class="mobile-dock" aria-label="میانبر موبایل">
+    <a href="index.html">خانه</a>
+    <a href="shop.html" class="active">فروشگاه</a>
+    <button type="button" id="dockCart">سبد</button>
+    <a href="index.html#support">حساب</a>
+  </nav>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

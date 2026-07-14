@@ -16,8 +16,18 @@ type User struct {
 type Product struct {
 	ID         string             `json:"id"`
 	Name       string             `json:"name"`
+	CategoryID *string            `json:"categoryId,omitempty"`
 	Attributes []ProductAttribute `json:"attributes"`
 	Variants   []ProductVariant   `json:"variants"`
+}
+
+type ProductCategory struct {
+	ID        string `db:"id" json:"id"`
+	Name      string `db:"name" json:"name"`
+	Slug      string `db:"slug" json:"slug"`
+	Icon      string `db:"icon" json:"icon"`
+	SortOrder int    `db:"sort_order" json:"sortOrder"`
+	IsActive  bool   `db:"is_active" json:"isActive"`
 }
 
 type ProductAttribute struct {

@@ -57,6 +57,8 @@ export type ProductVariant = {
 export type Product = {
   id: string;
   name: string;
+  /** Optional product category (storefront / filtering) */
+  categoryId?: string | null;
   attributes: ProductAttribute[];
   variants: ProductVariant[];
 };

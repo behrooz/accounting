@@ -54,9 +54,26 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 	}
 }
 
-func Cors(origin string) gin.HandlerFunc {
+func Cors(originsCSV string) gin.HandlerFunc {
+	allowed := map[string]bool{}
+	for _, o := range strings.Split(originsCSV, ",") {
+		o = strings.TrimSpace(o)
+		if o != "" {
+			allowed[o] = true
+		}
+	}
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", origin)
+		origin := c.GetHeader("Origin")
+		if allowed["*"] {
+			c.Header("Access-Control-Allow-Origin", "*")
+		} else if origin != "" && allowed[origin] {
+			c.Header("Access-Control-Allow-Origin", origin)
+		} else if len(allowed) == 1 {
+			for o := range allowed {
+				c.Header("Access-Control-Allow-Origin", o)
+				break
+			}
+		}
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
