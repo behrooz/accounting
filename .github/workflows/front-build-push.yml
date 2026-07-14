@@ -38,10 +38,10 @@ jobs:
           cache-from: type=registry,ref=188.132.232.168:30836/accounting-front:latest
           cache-to: type=inline
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
+      - name: Install Helm
+        uses: azure/setup-helm@v4
         with:
-          version: "latest"
+          version: v4.0.4
 
       - name: Configure kubectl
         run: |
@@ -49,30 +49,22 @@ jobs:
           echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
 
-      - name: Update deployment image and rollout
+      - name: Helm upgrade and wait for rollout
         run: |
           NAMESPACE="${K8S_NAMESPACE:-default}"
-          DEPLOYMENT_NAME="${K8S_DEPLOYMENT_NAME:-accounting-front}"
-          CONTAINER_NAME="${K8S_CONTAINER_NAME:-accounting-front}"
           IMAGE_TAG="${{ github.run_number }}"
-          IMAGE_NAME="188.132.232.168:30836/accounting-front:${IMAGE_TAG}"
 
-          echo "Updating deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE}"
-          echo "Container: ${CONTAINER_NAME}"
-          echo "New image: ${IMAGE_NAME}"
+          echo "Upgrading accounting-front with image tag ${IMAGE_TAG}"
 
-          kubectl set image deployment/${DEPLOYMENT_NAME} \
-            ${CONTAINER_NAME}=${IMAGE_NAME} \
-            -n ${NAMESPACE}
-
-          kubectl rollout restart deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE}
-
-          echo "Waiting for rollout to complete..."
-          kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --timeout=5m
+          helm upgrade --install accounting-front ./front/chart \
+            --namespace "${NAMESPACE}" \
+            --create-namespace \
+            --set image.tag="${IMAGE_TAG}" \
+            --force-conflicts \
+            --wait \
+            --timeout 5m
 
           echo "✅ Front rollout completed successfully!"
           echo "New image tag: ${IMAGE_TAG}"
         env:
           K8S_NAMESPACE: ${{ secrets.FRONT_K8S_NAMESPACE || secrets.K8S_NAMESPACE || 'default' }}
-          K8S_DEPLOYMENT_NAME: ${{ secrets.FRONT_K8S_DEPLOYMENT_NAME || 'accounting-front' }}
-          K8S_CONTAINER_NAME: ${{ secrets.FRONT_K8S_CONTAINER_NAME || 'accounting-front' }}

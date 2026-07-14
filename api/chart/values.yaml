@@ -1,10 +1,9 @@
 # Default values for accounting-api
 replicaCount: 1
 
-# Recreate: kill old pod first, then start new (needed on small nodes)
-# RollingUpdate with maxSurge=0 also avoids running 2 pods at once
+# maxSurge: 0 = don't create a second pod; terminates old first (for small nodes)
 strategy:
-  type: Recreate
+  type: RollingUpdate
   rollingUpdate:
     maxSurge: 0
     maxUnavailable: 1

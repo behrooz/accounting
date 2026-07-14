@@ -9,8 +9,10 @@ spec:
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   strategy:
-    type: {{ .Values.strategy.type | default "Recreate" }}
-    {{- if eq (.Values.strategy.type | default "Recreate") "RollingUpdate" }}
+    {{- if eq (.Values.strategy.type | default "RollingUpdate") "Recreate" }}
+    type: Recreate
+    {{- else }}
+    type: RollingUpdate
     rollingUpdate:
       maxSurge: {{ .Values.strategy.rollingUpdate.maxSurge | default 0 }}
       maxUnavailable: {{ .Values.strategy.rollingUpdate.maxUnavailable | default 1 }}
