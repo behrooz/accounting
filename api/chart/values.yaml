@@ -11,7 +11,7 @@ strategy:
 image:
   repository: 188.132.232.168:30836/accounting-api
   pullPolicy: IfNotPresent
-  tag: "2"
+  tag: "5"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -40,6 +40,8 @@ service:
   port: 8080
   targetPort: 8080
   annotations: {}
+  # Needed when pod Ready condition never becomes True (e.g. vCluster status sync)
+  publishNotReadyAddresses: true
 
 # Prometheus Metrics Configuration
 metrics:
@@ -128,7 +130,10 @@ secrets:
   mysqlDsn: "root:secret123@tcp(mysql-headless:3306)/accounting?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci&multiStatements=true"
   jwtSecret: "change-me-in-production"
 
-# Liveness and Readiness Probes
+# Probes (disabled — set enabled: true to turn on)
+probes:
+  enabled: false
+
 livenessProbe:
   httpGet:
     path: /health

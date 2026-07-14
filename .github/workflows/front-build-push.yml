@@ -31,7 +31,7 @@ jobs:
           file: ./front/Dockerfile
           push: true
           build-args: |
-            NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api' }}
+            NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL || 'https://ns-xp45-default-accounting-api.bugx.ir/api' }}
           tags: |
             188.132.232.168:30836/accounting-front:${{ github.run_number }}
             188.132.232.168:30836/accounting-front:latest
@@ -60,7 +60,7 @@ jobs:
             --namespace "${NAMESPACE}" \
             --create-namespace \
             --set image.tag="${IMAGE_TAG}" \
-            --force-conflicts \
+            --server-side=false \
             --wait \
             --timeout 5m
 

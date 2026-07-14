@@ -11,7 +11,7 @@ strategy:
 image:
   repository: 188.132.232.168:30836/accounting-front
   pullPolicy: IfNotPresent
-  tag: "2"
+  tag: "5"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -40,6 +40,8 @@ service:
   port: 3000
   targetPort: 3000
   annotations: {}
+  # Needed when pod Ready condition never becomes True (e.g. vCluster status sync)
+  publishNotReadyAddresses: true
 
 # Prometheus Metrics Configuration
 metrics:
@@ -113,7 +115,10 @@ secrets:
   enabled: false
   data: {}
 
-# Liveness and Readiness Probes
+# Probes (disabled — set enabled: true to turn on)
+probes:
+  enabled: false
+
 livenessProbe:
   httpGet:
     path: /

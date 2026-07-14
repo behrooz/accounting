@@ -58,7 +58,7 @@ jobs:
             --namespace "${NAMESPACE}" \
             --create-namespace \
             --set image.tag="${IMAGE_TAG}" \
-            --force-conflicts \
+            --server-side=false \
             --wait \
             --timeout 5m
 
