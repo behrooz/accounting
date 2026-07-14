@@ -1,9 +1,18 @@
+# Default values for accounting-front
 replicaCount: 1
+
+# Recreate: kill old pod first, then start new (needed on small nodes)
+# RollingUpdate with maxSurge=0 also avoids running 2 pods at once
+strategy:
+  type: Recreate
+  rollingUpdate:
+    maxSurge: 0
+    maxUnavailable: 1
 
 image:
   repository: 188.132.232.168:30836/accounting-front
   pullPolicy: IfNotPresent
-  tag: "1"
+  tag: "2"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -11,93 +20,141 @@ fullnameOverride: ""
 
 serviceAccount:
   create: true
-  automount: true
   annotations: {}
   name: ""
 
 podAnnotations: {}
-podLabels: {}
 
-podSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 1001
-  fsGroup: 1001
+podSecurityContext: {}
+  # fsGroup: 2000
 
-securityContext:
-  allowPrivilegeEscalation: false
-  capabilities:
-    drop:
-      - ALL
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1001
 
 service:
   type: ClusterIP
   port: 3000
+  targetPort: 3000
+  annotations: {}
+
+# Prometheus Metrics Configuration
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+    annotations: {}
+    relabelings: []
+    metricRelabelings: []
 
 ingress:
-  enabled: false
-  className: ""
-  annotations: {}
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    kubernetes.io/ingress.class: nginx
   hosts:
-    - host: front.accounting.local
+    - host: ns-xp45-default-accounting-front.bugx.ir
       paths:
         - path: /
           pathType: Prefix
-  tls: []
-
-httpRoute:
-  enabled: false
-  annotations: {}
-  parentRefs:
-    - name: gateway
-      sectionName: http
-  hostnames:
-    - front.accounting.local
-  rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /
+  tls:
+    - secretName: accounting-front-tls
+      hosts:
+        - ns-xp45-default-accounting-front.bugx.ir
 
 resources:
-  requests:
-    memory: "128Mi"
-    cpu: "100m"
   limits:
-    memory: "256Mi"
-    cpu: "200m"
+    cpu: 100m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
 
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Environment Variables
+# NOTE: NEXT_PUBLIC_API_BASE_URL is baked into the image at docker build time.
+# Rebuild the front image with --build-arg when changing the public API URL.
+env:
+  - name: NODE_ENV
+    value: "production"
+  - name: PORT
+    value: "3000"
+  - name: HOSTNAME
+    value: "0.0.0.0"
+  - name: NEXT_TELEMETRY_DISABLED
+    value: "1"
+
+# ConfigMap for additional configuration
+configMap:
+  enabled: false
+  data: {}
+
+# Secrets for sensitive data (optional)
+secrets:
+  enabled: false
+  data: {}
+
+# Liveness and Readiness Probes
 livenessProbe:
   httpGet:
     path: /
     port: http
-  initialDelaySeconds: 15
-  periodSeconds: 20
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
 
 readinessProbe:
   httpGet:
     path: /
     port: http
-  initialDelaySeconds: 5
-  periodSeconds: 10
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
 
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 80
-
+# Additional volumes
 volumes: []
+
 volumeMounts: []
 
-nodeSelector: {}
-tolerations: []
-affinity: {}
+# Init containers
+initContainers: []
 
-# Runtime env for Next.js standalone server.
-# NOTE: NEXT_PUBLIC_API_BASE_URL is baked into the image at docker build time.
-# Rebuild the image with --build-arg when changing the public API URL.
-env:
-  NODE_ENV: production
-  PORT: "3000"
-  HOSTNAME: "0.0.0.0"
-  NEXT_TELEMETRY_DISABLED: "1"
+# Sidecar containers
+sidecars: []
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []

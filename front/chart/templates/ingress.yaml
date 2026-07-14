@@ -2,16 +2,16 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "chart.fullname" . }}
+  name: {{ include "accounting-front.fullname" . }}
   labels:
-    {{- include "chart.labels" . | nindent 4 }}
+    {{- include "accounting-front.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- with .Values.ingress.className }}
-  ingressClassName: {{ . }}
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
   {{- end }}
   {{- if .Values.ingress.tls }}
   tls:
@@ -30,12 +30,10 @@ spec:
         paths:
           {{- range .paths }}
           - path: {{ .path }}
-            {{- with .pathType }}
-            pathType: {{ . }}
-            {{- end }}
+            pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "chart.fullname" $ }}
+                name: {{ include "accounting-front.fullname" $ }}
                 port:
                   number: {{ $.Values.service.port }}
           {{- end }}

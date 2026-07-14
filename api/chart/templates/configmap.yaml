@@ -1,10 +1,12 @@
+{{- if .Values.configMap.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "chart.fullname" . }}
+  name: {{ include "accounting-api.fullname" . }}
   labels:
-    {{- include "chart.labels" . | nindent 4 }}
+    {{- include "accounting-api.labels" . | nindent 4 }}
 data:
-  {{- range $key, $value := .Values.config }}
+  {{- range $key, $value := .Values.configMap.data }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}
+{{- end }}

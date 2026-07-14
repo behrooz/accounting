@@ -1,9 +1,18 @@
+# Default values for accounting-api
 replicaCount: 1
+
+# Recreate: kill old pod first, then start new (needed on small nodes)
+# RollingUpdate with maxSurge=0 also avoids running 2 pods at once
+strategy:
+  type: Recreate
+  rollingUpdate:
+    maxSurge: 0
+    maxUnavailable: 1
 
 image:
   repository: 188.132.232.168:30836/accounting-api
   pullPolicy: IfNotPresent
-  tag: "1"
+  tag: "2"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -11,100 +20,156 @@ fullnameOverride: ""
 
 serviceAccount:
   create: true
-  automount: true
   annotations: {}
   name: ""
 
 podAnnotations: {}
-podLabels: {}
 
-podSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 10001
-  fsGroup: 10001
+podSecurityContext: {}
+  # fsGroup: 2000
 
-securityContext:
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
-  capabilities:
-    drop:
-      - ALL
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 10001
 
 service:
   type: ClusterIP
   port: 8080
+  targetPort: 8080
+  annotations: {}
+
+# Prometheus Metrics Configuration
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+    annotations: {}
+    relabelings: []
+    metricRelabelings: []
 
 ingress:
-  enabled: false
-  className: ""
-  annotations: {}
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    kubernetes.io/ingress.class: nginx
   hosts:
-    - host: api.accounting.local
+    - host: ns-xp45-default-accounting-api.bugx.ir
       paths:
         - path: /
           pathType: Prefix
-  tls: []
-
-httpRoute:
-  enabled: false
-  annotations: {}
-  parentRefs:
-    - name: gateway
-      sectionName: http
-  hostnames:
-    - api.accounting.local
-  rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /
+  tls:
+    - secretName: accounting-api-tls
+      hosts:
+        - ns-xp45-default-accounting-api.bugx.ir
 
 resources:
-  requests:
-    memory: "512Mi"
-    cpu: "500m"
   limits:
-    memory: "512Mi"
-    cpu: "500m"
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
 
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Environment Variables
+# Sensitive values can alternatively use valueFrom + secrets.enabled
+env:
+  - name: APP_ENV
+    value: "prod"
+  - name: APP_PORT
+    value: "8080"
+  - name: APP_CORS_ORIGIN
+    value: "https://ns-xp45-default-accounting-front.bugx.ir"
+  - name: TZ
+    value: "Asia/Tehran"
+  - name: MYSQL_DSN
+    value: "root:secret123@tcp(mysql-headless:3306)/accounting?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci&multiStatements=true"
+  - name: JWT_SECRET
+    value: "change-me-in-production"
+  # Example: load from Secret instead of plain value
+  # - name: MYSQL_DSN
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: accounting-api
+  #       key: MYSQL_DSN
+  # - name: JWT_SECRET
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: accounting-api
+  #       key: JWT_SECRET
+
+# ConfigMap for additional configuration
+configMap:
+  enabled: false
+  data: {}
+
+# Secrets for sensitive data (optional; wire via env valueFrom)
+secrets:
+  enabled: false
+  mysqlDsn: "root:secret123@tcp(mysql-headless:3306)/accounting?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci&multiStatements=true"
+  jwtSecret: "change-me-in-production"
+
+# Liveness and Readiness Probes
 livenessProbe:
   httpGet:
     path: /health
     port: http
-  initialDelaySeconds: 10
-  periodSeconds: 15
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
 
 readinessProbe:
   httpGet:
     path: /health
     port: http
-  initialDelaySeconds: 5
-  periodSeconds: 10
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
 
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 80
-
+# Additional volumes
 volumes: []
+
 volumeMounts: []
 
-nodeSelector: {}
-tolerations: []
-affinity: {}
+# Init containers
+initContainers: []
 
-# Non-sensitive app config (ConfigMap)
-config:
-  APP_ENV: prod
-  APP_PORT: "8080"
-  APP_CORS_ORIGIN: https://ns-xp45-default-accounting-front.bugx.ir
-  TZ: Asia/Tehran
+# Sidecar containers
+sidecars: []
 
-# Sensitive values (Secret). Override via --set or a values file; do not commit real secrets.
-secret:
-  create: true
-  # Use an existing Secret instead of creating one from values
-  existingSecret: ""
-  MYSQL_DSN: "root:secret123@tcp(mysql-headless:3306)/accounting?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci&multiStatements=true"
-  JWT_SECRET: "change-me-in-production"
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
