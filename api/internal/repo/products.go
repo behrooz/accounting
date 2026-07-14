@@ -1,8 +1,11 @@
 package repo
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"accounting-api/internal/models"
 
@@ -16,12 +19,13 @@ type productRow struct {
 }
 
 type attrRow struct {
-	ID        string `db:"id"`
-	ProductID string `db:"product_id"`
-	Name      string `db:"name"`
-	SortOrder int    `db:"sort_order"`
-	CreatedAt string `db:"created_at"`
-	UpdatedAt string `db:"updated_at"`
+	ID         string `db:"id"`
+	ProductID  string `db:"product_id"`
+	Name       string `db:"name"`
+	AllowImage bool   `db:"allow_image"`
+	SortOrder  int    `db:"sort_order"`
+	CreatedAt  string `db:"created_at"`
+	UpdatedAt  string `db:"updated_at"`
 }
 
 type optRow struct {
@@ -62,10 +66,30 @@ func ListProducts(db *sqlx.DB) ([]models.Product, error) {
 	return out, nil
 }
 
+type imgRow struct {
+	ID        string `db:"id"`
+	ProductID string `db:"product_id"`
+	Image     string `db:"image"`
+	SortOrder int    `db:"sort_order"`
+}
+
 func GetProduct(db *sqlx.DB, id string) (*models.Product, error) {
 	var p productRow
 	if err := db.Get(&p, "SELECT id, name, category_id FROM products WHERE id=? LIMIT 1", id); err != nil {
 		return nil, err
+	}
+
+	var imgRows []imgRow
+	if err := db.Select(&imgRows, `
+		SELECT id, product_id, image, sort_order
+		FROM product_images
+		WHERE product_id=?
+		ORDER BY sort_order ASC`, id); err != nil {
+		return nil, err
+	}
+	images := make([]string, 0, len(imgRows))
+	for _, row := range imgRows {
+		images = append(images, row.Image)
 	}
 
 	var attrs []attrRow
@@ -121,9 +145,10 @@ func GetProduct(db *sqlx.DB, id string) (*models.Product, error) {
 	fullAttrs := make([]models.ProductAttribute, 0, len(attrs))
 	for _, a := range attrs {
 		fullAttrs = append(fullAttrs, models.ProductAttribute{
-			ID:      a.ID,
-			Name:    a.Name,
-			Options: optsByAttr[a.ID],
+			ID:         a.ID,
+			Name:       a.Name,
+			AllowImage: a.AllowImage,
+			Options:    optsByAttr[a.ID],
 		})
 	}
 
@@ -131,6 +156,7 @@ func GetProduct(db *sqlx.DB, id string) (*models.Product, error) {
 		ID:         p.ID,
 		Name:       p.Name,
 		CategoryID: nullStringPtr(p.CategoryID),
+		Images:     images,
 		Attributes: fullAttrs,
 		Variants:   variants,
 	}, nil
@@ -144,6 +170,17 @@ func nullStringPtr(ns sql.NullString) *string {
 	return &s
 }
 
+func newID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf(
+		"%x-%x-%x-%x-%x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16],
+	)
+}
+
 func UpsertProduct(db *sqlx.DB, p models.Product) error {
 	return WithTx(db, func(tx *sqlx.Tx) error {
 		_, err := tx.Exec(
@@ -155,16 +192,35 @@ func UpsertProduct(db *sqlx.DB, p models.Product) error {
 			return err
 		}
 
-		// Replace attributes/options/variants for simplicity (matches localStorage overwrite behavior)
+		// Replace attributes/options/variants/images for simplicity (matches localStorage overwrite behavior)
 		if _, err := tx.Exec("DELETE FROM product_attributes WHERE product_id=?", p.ID); err != nil {
 			return err
 		}
 		if _, err := tx.Exec("DELETE FROM product_variants WHERE product_id=?", p.ID); err != nil {
 			return err
 		}
+		if _, err := tx.Exec("DELETE FROM product_images WHERE product_id=?", p.ID); err != nil {
+			return err
+		}
+
+		for i, img := range p.Images {
+			if strings.TrimSpace(img) == "" {
+				continue
+			}
+			_, err := tx.Exec(
+				`INSERT INTO product_images(id, product_id, image, sort_order) VALUES(?,?,?,?)`,
+				newID(), p.ID, img, i,
+			)
+			if err != nil {
+				return err
+			}
+		}
 
 		for i, a := range p.Attributes {
-			_, err := tx.Exec(`INSERT INTO product_attributes(id, product_id, name, sort_order) VALUES(?,?,?,?)`, a.ID, p.ID, a.Name, i)
+			_, err := tx.Exec(
+				`INSERT INTO product_attributes(id, product_id, name, allow_image, sort_order) VALUES(?,?,?,?,?)`,
+				a.ID, p.ID, a.Name, a.AllowImage, i,
+			)
 			if err != nil {
 				return err
 			}

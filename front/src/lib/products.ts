@@ -32,6 +32,8 @@ export type AttributeOption = {
 export type ProductAttribute = {
   id: string;
   name: string;
+  /** When true, variants can upload images for this attribute (e.g. رنگ) */
+  allowImage?: boolean;
   options: AttributeOption[];
 };
 
@@ -59,6 +61,8 @@ export type Product = {
   name: string;
   /** Optional product category (storefront / filtering) */
   categoryId?: string | null;
+  /** Product gallery images (bulk upload, not tied to attributes) */
+  images?: string[];
   attributes: ProductAttribute[];
   variants: ProductVariant[];
 };

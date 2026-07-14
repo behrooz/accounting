@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   generateVariantCombinations,
@@ -15,6 +15,30 @@ import {
   type ProductCategory,
 } from "@/lib/categories";
 import VariantsGrid from "./VariantsGrid";
+
+/* ─── Image helpers ─────────────────────────────────────────────────────── */
+function compressImage(file: File, maxPx = 960): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("image decode failed"));
+      img.onload = () => {
+        const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas
+          .getContext("2d")!
+          .drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.src = e.target!.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 /* ─── Small inline helper: tag-style option input ───────────────────────── */
 function AddOptionInput({ onAdd }: { onAdd: (label: string) => void }) {
@@ -53,8 +77,13 @@ type Props = {
 /* ─── Component ──────────────────────────────────────────────────────────── */
 export default function ProductEditor({ initialProduct, isNew }: Props) {
   const router = useRouter();
-  const [product, setProduct] = useState<Product>(initialProduct);
+  const [product, setProduct] = useState<Product>({
+    ...initialProduct,
+    images: initialProduct.images ?? [],
+  });
   const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void getCategories().then(setCategories);
@@ -66,7 +95,6 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
     [],
   );
 
-  /* ── Name ────────────────────────────────────────────────────────────── */
   const handleNameChange = (name: string) =>
     setProduct((p) => ({ ...p, name }));
 
@@ -76,12 +104,47 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
       categoryId: categoryId || null,
     }));
 
-  /* ── Attributes ─────────────────────────────────────────────────────── */
+  const handleBulkImages = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploadingImages(true);
+    try {
+      const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
+      const compressed = await Promise.all(list.map((f) => compressImage(f)));
+      setProduct((p) => ({
+        ...p,
+        images: [...(p.images ?? []), ...compressed],
+      }));
+    } catch {
+      alert("آپلود یک یا چند تصویر ناموفق بود.");
+    } finally {
+      setUploadingImages(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveImage = (index: number) =>
+    setProduct((p) => ({
+      ...p,
+      images: (p.images ?? []).filter((_, i) => i !== index),
+    }));
+
+  const handleMoveImage = (index: number, dir: -1 | 1) =>
+    setProduct((p) => {
+      const nextImages = [...(p.images ?? [])];
+      const next = index + dir;
+      if (next < 0 || next >= nextImages.length) return p;
+      const tmp = nextImages[index]!;
+      nextImages[index] = nextImages[next]!;
+      nextImages[next] = tmp;
+      return { ...p, images: nextImages };
+    });
+
   const handleAddAttribute = () => {
     setProduct((p) => {
       const newAttr: ProductAttribute = {
         id: crypto.randomUUID(),
         name: "",
+        allowImage: false,
         options: [],
       };
       return { ...p, attributes: [...p.attributes, newAttr] };
@@ -140,13 +203,11 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
     });
   };
 
-  /* ── Variants ────────────────────────────────────────────────────────── */
   const handleVariantsChange = useCallback(
     (variants: ProductVariant[]) => setProduct((p) => ({ ...p, variants })),
     [],
   );
 
-  /* ── Save / Cancel ───────────────────────────────────────────────────── */
   const handleSave = async () => {
     const trimmed = product.name.trim();
     if (!trimmed) {
@@ -157,16 +218,20 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
       ...product,
       name: trimmed,
       categoryId: product.categoryId || null,
+      images: product.images ?? [],
+      attributes: product.attributes.map((a) => ({
+        ...a,
+        allowImage: !!a.allowImage,
+      })),
     });
     router.push("/products/manage");
   };
 
   const handleCancel = () => router.push("/products/manage");
+  const images = product.images ?? [];
 
-  /* ── Render ──────────────────────────────────────────────────────────── */
   return (
     <div className="mx-auto w-full max-w-5xl p-6 flex flex-col gap-5">
-      {/* ── Page header ─────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d5dbdb] pb-4">
         <div>
           <h1 className="text-xl font-bold text-[#16191f]">
@@ -192,7 +257,6 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
         </div>
       </div>
 
-      {/* ── Product basics ───────────────────────────────────────────────── */}
       <section className="rounded border border-[#d5dbdb] bg-white shadow-sm">
         <div className="border-b border-[#d5dbdb] bg-[#f2f3f3] px-5 py-3">
           <h2 className="text-sm font-semibold text-[#16191f]">
@@ -227,7 +291,96 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
         </div>
       </section>
 
-      {/* ── Attribute builder ────────────────────────────────────────────── */}
+      <section className="rounded border border-[#d5dbdb] bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d5dbdb] bg-[#f2f3f3] px-5 py-3">
+          <div>
+            <h2 className="text-sm font-semibold text-[#16191f]">
+              تصاویر محصول
+            </h2>
+            <p className="mt-0.5 text-xs text-[#545b64]">
+              چند تصویر را یکجا انتخاب کنید — مربوط به کل محصول است، نه ویژگی.
+            </p>
+          </div>
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => void handleBulkImages(e.target.files)}
+            />
+            <button
+              type="button"
+              disabled={uploadingImages}
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded border border-[#0073bb] bg-white px-3 py-1.5 text-sm font-medium text-[#0073bb] hover:bg-[#e7f2f8] transition disabled:opacity-50"
+            >
+              {uploadingImages ? "در حال آپلود…" : "+ آپلود گروهی تصاویر"}
+            </button>
+          </div>
+        </div>
+        <div className="p-5">
+          {images.length === 0 ? (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex w-full flex-col items-center justify-center gap-2 rounded border border-dashed border-[#aab7b8] bg-[#f8f9f9] py-10 text-sm text-[#879596] hover:border-[#0073bb] hover:text-[#0073bb] transition"
+            >
+              <span className="text-2xl leading-none">📷</span>
+              <span>برای انتخاب چند تصویر کلیک کنید</span>
+            </button>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {images.map((src, index) => (
+                <div
+                  key={`${index}-${src.slice(0, 32)}`}
+                  className="group relative overflow-hidden rounded border border-[#d5dbdb] bg-[#f2f3f3]"
+                >
+                  <img
+                    src={src}
+                    alt=""
+                    className="aspect-square w-full object-cover"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 flex justify-between gap-1 bg-black/55 p-1.5 opacity-0 transition group-hover:opacity-100">
+                    <button
+                      type="button"
+                      disabled={index === 0}
+                      onClick={() => handleMoveImage(index, -1)}
+                      className="rounded bg-white/90 px-2 py-0.5 text-xs disabled:opacity-40"
+                      title="جابه‌جایی به قبل"
+                    >
+                      ←
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(index)}
+                      className="rounded bg-[#d13212] px-2 py-0.5 text-xs text-white"
+                    >
+                      حذف
+                    </button>
+                    <button
+                      type="button"
+                      disabled={index === images.length - 1}
+                      onClick={() => handleMoveImage(index, 1)}
+                      className="rounded bg-white/90 px-2 py-0.5 text-xs disabled:opacity-40"
+                      title="جابه‌جایی به بعد"
+                    >
+                      →
+                    </button>
+                  </div>
+                  {index === 0 && (
+                    <span className="absolute left-1.5 top-1.5 rounded bg-[#0073bb] px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      اصلی
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       <section className="rounded border border-[#d5dbdb] bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-[#d5dbdb] bg-[#f2f3f3] px-5 py-3">
           <div>
@@ -257,7 +410,6 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
                   key={attr.id}
                   className="flex flex-wrap items-center gap-3 rounded border border-[#d5dbdb] bg-[#f2f3f3] p-3"
                 >
-                  {/* Attribute name */}
                   <input
                     value={attr.name}
                     onChange={(e) =>
@@ -269,7 +421,6 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
 
                   <span className="text-[#aab7b8] select-none">:</span>
 
-                  {/* Option tags */}
                   <div className="flex flex-wrap gap-1.5">
                     {attr.options.map((opt) => (
                       <span
@@ -292,7 +443,6 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
                     />
                   </div>
 
-                  {/* Remove attribute */}
                   <button
                     type="button"
                     onClick={() => handleRemoveAttribute(attr.id)}
@@ -307,7 +457,6 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
         </div>
       </section>
 
-      {/* ── Variants grid ────────────────────────────────────────────────── */}
       <section className="rounded border border-[#d5dbdb] bg-white shadow-sm">
         <div className="border-b border-[#d5dbdb] bg-[#f2f3f3] px-5 py-3">
           <h2 className="text-sm font-semibold text-[#16191f]">

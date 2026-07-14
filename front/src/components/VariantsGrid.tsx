@@ -36,33 +36,9 @@ const gridTheme = themeQuartz.withParams({
   selectedRowBackgroundColor: "#e7f2f8",
 });
 
-/* ─── Image helpers ──────────────────────────────────────────────── */
-/** Resize + compress a File to a small JPEG data-URL for localStorage. */
-function compressImage(file: File, maxPx = 320): Promise<string> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * ratio);
-        canvas.height = Math.round(img.height * ratio);
-        canvas
-          .getContext("2d")!
-          .drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
-      };
-      img.src = e.target!.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
 /* ─── Types ──────────────────────────────────────────────────────── */
 type GridCtx = {
   handleDelete: (id: string) => void;
-  handleImageChange: (id: string, image: string) => void;
 };
 type GridRef = AgGridReact<ProductVariant>;
 
@@ -70,48 +46,6 @@ type GridRef = AgGridReact<ProductVariant>;
 const NoRowsOverlay = () => (
   <p className="text-sm text-[#545b64]">هنوز ترکیبی تعریف نشده.</p>
 );
-
-const ImageCellRenderer = ({ data, context }: ICellRendererParams) => {
-  const v = data as ProductVariant;
-  const ctx = context as GridCtx;
-
-  const openPicker = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const compressed = await compressImage(file);
-      ctx.handleImageChange(v.id, compressed);
-    };
-    input.click();
-  };
-
-  return (
-    <div className="flex h-full items-center justify-center">
-      <button
-        onClick={openPicker}
-        title="کلیک برای آپلود / تغییر تصویر"
-        className="group relative flex h-10 w-10 items-center justify-center overflow-hidden rounded border border-dashed border-[#aab7b8] bg-[#f2f3f3] hover:border-[#0073bb] transition"
-      >
-        {v.image ? (
-          <>
-            <img src={v.image} alt="" className="h-full w-full object-cover" />
-            {/* hover overlay */}
-            <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition text-white text-[10px]">
-              تغییر
-            </span>
-          </>
-        ) : (
-          <span className="text-[#aab7b8] text-lg group-hover:text-[#0073bb] transition select-none">
-            &#128247;
-          </span>
-        )}
-      </button>
-    </div>
-  );
-};
 
 const ActionCellRenderer = ({ data, context }: ICellRendererParams) => {
   const ctx = context as GridCtx;
@@ -132,8 +66,7 @@ const isEmptyVariant = (v: ProductVariant) =>
   v.sku === "" &&
   v.price === 0 &&
   v.salePrice === 0 &&
-  v.quantity === 0 &&
-  !v.image;
+  v.quantity === 0;
 
 /* ─── Props ──────────────────────────────────────────────────────────────── */
 type Props = {
@@ -181,25 +114,7 @@ export default function VariantsGrid({
     [commit],
   );
 
-  /* ── Image upload ───────────────────────────────────────────────────────── */
-  const handleImageChange = useCallback(
-    (id: string, image: string) => {
-      commit(dataRef.current.map((v) => (v.id === id ? { ...v, image } : v)));
-    },
-    [commit],
-  );
-
   const columnDefs = useMemo<ColDef<ProductVariant>[]>(() => {
-    const imageCol: ColDef<ProductVariant> = {
-      headerName: "تصویر",
-      cellRenderer: ImageCellRenderer,
-      editable: false,
-      sortable: false,
-      filter: false,
-      width: 72,
-      resizable: false,
-    };
-
     const attrCols: ColDef<ProductVariant>[] = attributes.map((attr) => ({
       colId: `attr-${attr.id}`,
       headerName: attr.name,
@@ -214,7 +129,6 @@ export default function VariantsGrid({
     }));
 
     return [
-      imageCol,
       ...attrCols,
       {
         field: "sku",
@@ -432,7 +346,7 @@ export default function VariantsGrid({
           onCellEditingStopped={onCellEditingStopped}
           enableRtl={true}
           animateRows={true}
-          context={{ handleDelete, handleImageChange } satisfies GridCtx}
+          context={{ handleDelete } satisfies GridCtx}
           noRowsOverlayComponent={NoRowsOverlay}
         />
       </div>

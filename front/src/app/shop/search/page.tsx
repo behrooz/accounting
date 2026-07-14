@@ -9,6 +9,10 @@ const PLACEHOLDER =
   "https://images.unsplash.com/photo-1520975919572-9aebc6a48b6b?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=4c1b8f9b1b7d6b0b1f2a9d6e2c8f7f4a";
 
 function getProductImages(p: Product): string[] {
+  const gallery = (p.images ?? [])
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (gallery.length) return Array.from(new Set(gallery));
   const imgs = p.variants
     .map((v) => v.image)
     .filter((s): s is string => Boolean(s))

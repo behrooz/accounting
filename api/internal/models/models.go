@@ -17,6 +17,7 @@ type Product struct {
 	ID         string             `json:"id"`
 	Name       string             `json:"name"`
 	CategoryID *string            `json:"categoryId,omitempty"`
+	Images     []string           `json:"images,omitempty"`
 	Attributes []ProductAttribute `json:"attributes"`
 	Variants   []ProductVariant   `json:"variants"`
 }
@@ -31,10 +32,11 @@ type ProductCategory struct {
 }
 
 type ProductAttribute struct {
-	ID        string            `json:"id"`
-	Name      string            `json:"name"`
-	Options   []AttributeOption `json:"options"`
-	SortOrder int               `json:"-"`
+	ID         string            `json:"id"`
+	Name       string            `json:"name"`
+	AllowImage bool              `json:"allowImage"`
+	Options    []AttributeOption `json:"options"`
+	SortOrder  int               `json:"-"`
 }
 
 type AttributeOption struct {

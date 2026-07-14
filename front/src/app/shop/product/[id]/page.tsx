@@ -59,12 +59,17 @@ export default function ProductDetailPage() {
       </div>
     );
 
+  const gallery = (product.images ?? [])
+    .map((s) => s.trim())
+    .filter(Boolean);
   const images = Array.from(
     new Set(
-      product.variants
-        .map((v) => v.image)
-        .filter((s): s is string => Boolean(s))
-        .map((s) => s!.trim()),
+      gallery.length
+        ? gallery
+        : product.variants
+            .map((v) => v.image)
+            .filter((s): s is string => Boolean(s))
+            .map((s) => s!.trim()),
     ),
   );
   const slides = images.length ? images : [PLACEHOLDER];
