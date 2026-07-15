@@ -24,7 +24,7 @@ const gridTheme = themeQuartz.withParams({
   fontFamily: "inherit",
   fontSize: 14,
   rowHeight: 56,
-  headerHeight: 36,
+  headerHeight: 52,
   accentColor: "#0073bb",
   backgroundColor: "#ffffff",
   foregroundColor: "#16191f",
@@ -59,9 +59,13 @@ function compressImage(file: File, maxPx = 320): Promise<string> {
 }
 
 /* ─── Types ──────────────────────────────────────────────────────── */
+type ApplyField = "price" | "salePrice" | "quantity";
+
 type GridCtx = {
   handleDelete: (id: string) => void;
   handleImageChange: (id: string, image: string) => void;
+  applyFieldToAll: (field: ApplyField) => void;
+  getLastFieldValue: (field: ApplyField) => number | undefined;
 };
 type GridRef = AgGridReact<ProductVariant>;
 
@@ -126,6 +130,39 @@ const ActionCellRenderer = ({ data, context }: ICellRendererParams) => {
   );
 };
 
+/** Header with title + "اعمال برای همه" for price / salePrice / quantity */
+function ApplyAllHeader(props: {
+  displayName: string;
+  column: { getColId: () => string };
+  context: GridCtx;
+}) {
+  const field = props.column.getColId() as ApplyField;
+  const last = props.context.getLastFieldValue(field);
+  return (
+    <div className="flex h-full flex-col items-stretch justify-center gap-1 px-0.5 py-0.5">
+      <span className="text-xs font-semibold leading-tight text-[#16191f]">
+        {props.displayName}
+      </span>
+      <button
+        type="button"
+        title={
+          last === undefined
+            ? "ابتدا یک مقدار در این ستون وارد کنید"
+            : `آخرین مقدار: ${last.toLocaleString("fa-IR")} — برای همه اعمال شود`
+        }
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          props.context.applyFieldToAll(field);
+        }}
+        className="rounded border border-[#0073bb] bg-white px-1 py-0.5 text-[10px] font-medium leading-tight text-[#0073bb] hover:bg-[#e7f2f8] transition"
+      >
+        اعمال برای همه
+      </button>
+    </div>
+  );
+}
+
 const isEmptyVariant = (v: ProductVariant) =>
   v.sku === "" &&
   v.price === 0 &&
@@ -151,6 +188,7 @@ export default function VariantsGrid({
   const draftRowIdsRef = useRef<Set<string>>(new Set());
   const lastFocusedRowIdRef = useRef<string | null>(null);
   const cleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFieldValuesRef = useRef<Partial<Record<ApplyField, number>>>({});
   const [localVariants, setLocalVariants] =
     useState<ProductVariant[]>(variants);
 
@@ -186,6 +224,29 @@ export default function VariantsGrid({
     [commit],
   );
 
+  const getLastFieldValue = useCallback(
+    (field: ApplyField) => lastFieldValuesRef.current[field],
+    [],
+  );
+
+  const applyFieldToAll = useCallback(
+    (field: ApplyField) => {
+      const val = lastFieldValuesRef.current[field];
+      if (val === undefined) {
+        alert("ابتدا یک مقدار در این ستون وارد کنید، بعد «اعمال برای همه» را بزنید.");
+        return;
+      }
+      if (!dataRef.current.length) return;
+      commit(
+        dataRef.current.map((v) => ({
+          ...v,
+          [field]: val,
+        })),
+      );
+    },
+    [commit],
+  );
+
   const columnDefs = useMemo<ColDef<ProductVariant>[]>(() => {
     const allowImageUpload = attributes.some((a) => !!a.allowImage);
 
@@ -212,6 +273,27 @@ export default function VariantsGrid({
       filter: "agTextColumnFilter",
     }));
 
+    const numericApplyCol = (
+      field: ApplyField,
+      headerName: string,
+      minWidth: number,
+      extra?: Partial<ColDef<ProductVariant>>,
+    ): ColDef<ProductVariant> => ({
+      field,
+      headerName,
+      headerComponent: ApplyAllHeader,
+      editable: true,
+      flex: 1,
+      minWidth,
+      sortable: true,
+      resizable: true,
+      filter: "agNumberColumnFilter",
+      valueFormatter: (p) =>
+        p.value != null ? Number(p.value).toLocaleString("fa-IR") : "",
+      valueParser: (p) => Number(p.newValue) || 0,
+      ...extra,
+    });
+
     return [
       ...(allowImageUpload ? [imageCol] : []),
       ...attrCols,
@@ -225,49 +307,14 @@ export default function VariantsGrid({
         resizable: true,
         filter: "agTextColumnFilter",
       },
-      {
-        field: "price",
-        headerName: "قیمت خرید",
-        editable: true,
-        flex: 1,
-        minWidth: 140,
-        sortable: true,
-        resizable: true,
-        filter: "agNumberColumnFilter",
-        valueFormatter: (p) =>
-          p.value != null ? Number(p.value).toLocaleString("fa-IR") : "",
-        valueParser: (p) => Number(p.newValue) || 0,
-      },
-      {
-        field: "salePrice",
-        headerName: "قیمت فروش",
-        editable: true,
-        flex: 1,
-        minWidth: 140,
-        sortable: true,
-        resizable: true,
-        filter: "agNumberColumnFilter",
-        valueFormatter: (p) =>
-          p.value != null ? Number(p.value).toLocaleString("fa-IR") : "",
-        valueParser: (p) => Number(p.newValue) || 0,
-      },
-      {
-        field: "quantity",
-        headerName: "تعداد",
-        editable: true,
-        flex: 1,
-        minWidth: 100,
-        sortable: true,
-        resizable: true,
-        filter: "agNumberColumnFilter",
-        valueFormatter: (p) =>
-          p.value != null ? Number(p.value).toLocaleString("fa-IR") : "",
-        valueParser: (p) => Number(p.newValue) || 0,
+      numericApplyCol("price", "قیمت خرید", 150),
+      numericApplyCol("salePrice", "قیمت فروش", 150),
+      numericApplyCol("quantity", "تعداد", 120, {
         suppressKeyboardEvent: ({ event, editing }) =>
           editing &&
           !event.shiftKey &&
           (event.key === "Tab" || event.key === "Enter"),
-      },
+      }),
       {
         headerName: "عملیات",
         cellRenderer: ActionCellRenderer,
@@ -315,7 +362,15 @@ export default function VariantsGrid({
     (e: CellValueChangedEvent<ProductVariant>) => {
       const updated = { ...e.data } as ProductVariant;
       updated.price = Number(updated.price) || 0;
+      updated.salePrice = Number(updated.salePrice) || 0;
       updated.quantity = Number(updated.quantity) || 0;
+
+      const colId = e.column.getColId();
+      if (colId === "price" || colId === "salePrice" || colId === "quantity") {
+        lastFieldValuesRef.current[colId] = updated[colId];
+        gridRef.current?.api?.refreshHeader();
+      }
+
       commit(dataRef.current.map((v) => (v.id === updated.id ? updated : v)));
     },
     [commit],
@@ -431,7 +486,14 @@ export default function VariantsGrid({
           onCellEditingStopped={onCellEditingStopped}
           enableRtl={true}
           animateRows={true}
-          context={{ handleDelete, handleImageChange } satisfies GridCtx}
+          context={
+            {
+              handleDelete,
+              handleImageChange,
+              applyFieldToAll,
+              getLastFieldValue,
+            } satisfies GridCtx
+          }
           noRowsOverlayComponent={NoRowsOverlay}
         />
       </div>

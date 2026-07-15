@@ -247,8 +247,8 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	// Products
-	authed.GET("/products", func(c *gin.Context) {
+	// Public products (storefront)
+	api.GET("/products", func(c *gin.Context) {
 		ps, err := repo.ListProducts(database)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
@@ -256,7 +256,7 @@ func main() {
 		}
 		c.JSON(http.StatusOK, ps)
 	})
-	authed.GET("/products/:id", func(c *gin.Context) {
+	api.GET("/products/:id", func(c *gin.Context) {
 		p, err := repo.GetProduct(database, c.Param("id"))
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -264,6 +264,8 @@ func main() {
 		}
 		c.JSON(http.StatusOK, p)
 	})
+
+	// Products (write ops auth)
 	authed.POST("/products", func(c *gin.Context) {
 		var p models.Product
 		if err := c.ShouldBindJSON(&p); err != nil || p.ID == "" {
