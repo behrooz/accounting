@@ -90,7 +90,7 @@ func main() {
 		c.JSON(http.StatusOK, row)
 	})
 
-	// Auth
+	// Auth (dashboard staff login)
 	api.POST("/auth/login", func(c *gin.Context) {
 		var body struct {
 			Username string `json:"username"`
@@ -130,6 +130,127 @@ func main() {
 		})
 	})
 
+	// ── Storefront public (no JWT) — catalog + checkout + phone-based addresses ──
+	api.GET("/products", func(c *gin.Context) {
+		ps, err := repo.ListProducts(database)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		c.JSON(http.StatusOK, ps)
+	})
+	api.GET("/products/:id", func(c *gin.Context) {
+		p, err := repo.GetProduct(database, c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.JSON(http.StatusOK, p)
+	})
+	api.POST("/checkout", func(c *gin.Context) {
+		var body repo.CheckoutRequest
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		inv, err := repo.CreateStorefrontOrder(database, body)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, inv)
+	})
+	api.GET("/store/customer", func(c *gin.Context) {
+		phone := strings.TrimSpace(c.Query("phone"))
+		if phone == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "phone required"})
+			return
+		}
+		cust, err := repo.FindCustomerByPhone(database, phone)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		addrs, _ := repo.ListAddresses(database, cust.ID)
+		cust.Addresses = addrs
+		c.JSON(http.StatusOK, cust)
+	})
+	api.POST("/store/addresses", func(c *gin.Context) {
+		var body struct {
+			Phone   string                 `json:"phone"`
+			Name    string                 `json:"name"`
+			Address models.CustomerAddress `json:"address"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Phone) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "phone and address required"})
+			return
+		}
+		cust, err := repo.EnsureCustomerByPhone(database, body.Name, body.Phone, "مشتری فروشگاه آنلاین")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		a := body.Address
+		a.CustomerID = cust.ID
+		if a.ID == "" {
+			a.ID = repo.NewID()
+		}
+		if a.Phone == "" {
+			a.Phone = body.Phone
+		}
+		if a.FullName == "" {
+			a.FullName = body.Name
+		}
+		if err := repo.UpsertAddress(database, a); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		addrs, _ := repo.ListAddresses(database, cust.ID)
+		cust.Addresses = addrs
+		c.JSON(http.StatusCreated, cust)
+	})
+	api.PUT("/store/addresses/:id/default", func(c *gin.Context) {
+		var body struct {
+			Phone string `json:"phone"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Phone) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "phone required"})
+			return
+		}
+		cust, err := repo.FindCustomerByPhone(database, body.Phone)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "customer not found"})
+			return
+		}
+		if err := repo.SetDefaultAddress(database, cust.ID, c.Param("id")); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		addrs, _ := repo.ListAddresses(database, cust.ID)
+		cust.Addresses = addrs
+		c.JSON(http.StatusOK, cust)
+	})
+	api.DELETE("/store/addresses/:id", func(c *gin.Context) {
+		phone := strings.TrimSpace(c.Query("phone"))
+		if phone == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "phone required"})
+			return
+		}
+		cust, err := repo.FindCustomerByPhone(database, phone)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "customer not found"})
+			return
+		}
+		a, err := repo.GetAddress(database, c.Param("id"))
+		if err != nil || a.CustomerID != cust.ID {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		_ = repo.DeleteAddress(database, a.ID)
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	// ── Dashboard (JWT required) ──
 	authed := api.Group("")
 	authed.Use(httpx.AuthRequired(cfg.JWTSecret))
 
@@ -288,131 +409,7 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	// Public products (storefront)
-	api.GET("/products", func(c *gin.Context) {
-		ps, err := repo.ListProducts(database)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
-			return
-		}
-		c.JSON(http.StatusOK, ps)
-	})
-	api.GET("/products/:id", func(c *gin.Context) {
-		p, err := repo.GetProduct(database, c.Param("id"))
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		c.JSON(http.StatusOK, p)
-	})
-
-	// Public storefront checkout → confirmed invoice (order)
-	api.POST("/checkout", func(c *gin.Context) {
-		var body repo.CheckoutRequest
-		if err := c.ShouldBindJSON(&body); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
-			return
-		}
-		inv, err := repo.CreateStorefrontOrder(database, body)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusCreated, inv)
-	})
-
-	// Storefront customer + addresses by phone (no JWT)
-	api.GET("/store/customer", func(c *gin.Context) {
-		phone := strings.TrimSpace(c.Query("phone"))
-		if phone == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "phone required"})
-			return
-		}
-		cust, err := repo.FindCustomerByPhone(database, phone)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		addrs, _ := repo.ListAddresses(database, cust.ID)
-		cust.Addresses = addrs
-		c.JSON(http.StatusOK, cust)
-	})
-	api.POST("/store/addresses", func(c *gin.Context) {
-		var body struct {
-			Phone   string                 `json:"phone"`
-			Name    string                 `json:"name"`
-			Address models.CustomerAddress `json:"address"`
-		}
-		if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Phone) == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "phone and address required"})
-			return
-		}
-		cust, err := repo.EnsureCustomerByPhone(database, body.Name, body.Phone, "مشتری فروشگاه آنلاین")
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		a := body.Address
-		a.CustomerID = cust.ID
-		if a.ID == "" {
-			a.ID = repo.NewID()
-		}
-		if a.Phone == "" {
-			a.Phone = body.Phone
-		}
-		if a.FullName == "" {
-			a.FullName = body.Name
-		}
-		if err := repo.UpsertAddress(database, a); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		addrs, _ := repo.ListAddresses(database, cust.ID)
-		cust.Addresses = addrs
-		c.JSON(http.StatusCreated, cust)
-	})
-	api.PUT("/store/addresses/:id/default", func(c *gin.Context) {
-		var body struct {
-			Phone string `json:"phone"`
-		}
-		if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Phone) == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "phone required"})
-			return
-		}
-		cust, err := repo.FindCustomerByPhone(database, body.Phone)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "customer not found"})
-			return
-		}
-		if err := repo.SetDefaultAddress(database, cust.ID, c.Param("id")); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		addrs, _ := repo.ListAddresses(database, cust.ID)
-		cust.Addresses = addrs
-		c.JSON(http.StatusOK, cust)
-	})
-	api.DELETE("/store/addresses/:id", func(c *gin.Context) {
-		phone := strings.TrimSpace(c.Query("phone"))
-		if phone == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "phone required"})
-			return
-		}
-		cust, err := repo.FindCustomerByPhone(database, phone)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "customer not found"})
-			return
-		}
-		a, err := repo.GetAddress(database, c.Param("id"))
-		if err != nil || a.CustomerID != cust.ID {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		_ = repo.DeleteAddress(database, a.ID)
-		c.JSON(http.StatusOK, gin.H{"ok": true})
-	})
-
-	// Products (write ops auth)
+	// Products (write ops auth — list/get are public above)
 	authed.POST("/products", func(c *gin.Context) {
 		var p models.Product
 		if err := c.ShouldBindJSON(&p); err != nil || p.ID == "" {
