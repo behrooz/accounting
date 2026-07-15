@@ -23,6 +23,9 @@ type invoiceRow struct {
 	Total           int64  `db:"total"`
 	Status          string `db:"status"`
 	Source          string `db:"source"`
+	ShippingMethod  string `db:"shipping_method"`
+	ShippingFee     int64  `db:"shipping_fee"`
+	PaymentMethod   string `db:"payment_method"`
 	CreatedAt       string `db:"created_at"`
 	UpdatedAt       string `db:"updated_at"`
 }
@@ -97,6 +100,9 @@ func GetInvoice(db *sqlx.DB, id string) (*models.Invoice, error) {
 		Total:           r.Total,
 		Status:          r.Status,
 		Source:          coalesceSource(r.Source),
+		ShippingMethod:  r.ShippingMethod,
+		ShippingFee:     r.ShippingFee,
+		PaymentMethod:   r.PaymentMethod,
 		CreatedAt:       r.CreatedAt,
 	}, nil
 }
@@ -110,7 +116,12 @@ func coalesceSource(s string) string {
 
 func NextInvoiceNumber(db *sqlx.DB) (string, error) {
 	var n int
-	if err := db.Get(&n, "SELECT COUNT(*) FROM invoices"); err != nil {
+	// Prefer numeric max of INV-#### to avoid collisions after deletes / partial failures.
+	err := db.Get(&n, `
+		SELECT COALESCE(MAX(CAST(SUBSTRING(number, 5) AS UNSIGNED)), 0)
+		FROM invoices
+		WHERE number LIKE 'INV-%'`)
+	if err != nil {
 		return "", err
 	}
 	return "INV-" + pad4(n+1), nil
@@ -171,8 +182,8 @@ func UpsertInvoice(db *sqlx.DB, inv models.Invoice) error {
 		_, err = tx.Exec(
 			`INSERT INTO invoices(
 				id, number, date, customer_id, customer_name, customer_phone, customer_address,
-				notes, discount, subtotal, total, status, source, created_at
-			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+				notes, discount, subtotal, total, status, source, shipping_method, shipping_fee, payment_method, created_at
+			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 			ON DUPLICATE KEY UPDATE
 				number=VALUES(number),
 				date=VALUES(date),
@@ -186,9 +197,13 @@ func UpsertInvoice(db *sqlx.DB, inv models.Invoice) error {
 				total=VALUES(total),
 				status=VALUES(status),
 				source=VALUES(source),
+				shipping_method=VALUES(shipping_method),
+				shipping_fee=VALUES(shipping_fee),
+				payment_method=VALUES(payment_method),
 				created_at=VALUES(created_at)`,
 			inv.ID, inv.Number, inv.Date, inv.CustomerID, inv.CustomerName, inv.CustomerPhone, inv.CustomerAddress,
-			inv.Notes, inv.Discount, inv.Subtotal, inv.Total, inv.Status, source, createdAt,
+			inv.Notes, inv.Discount, inv.Subtotal, inv.Total, inv.Status, source,
+			inv.ShippingMethod, inv.ShippingFee, inv.PaymentMethod, createdAt,
 		)
 		if err != nil {
 			return err

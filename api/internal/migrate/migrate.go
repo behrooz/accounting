@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 		for i, stmt := range splitStatements(sqlText) {
 			if _, err := db.Exec(stmt); err != nil {
+				if isIgnorableMigrationErr(err) {
+					continue
+				}
 				return fmt.Errorf("migration %s statement %d failed: %w", f, i+1, err)
 			}
 		}
@@ -170,4 +173,14 @@ func onlyWhitespaceOrSemicolons(s string) bool {
 		}
 	}
 	return true
+}
+
+func isIgnorableMigrationErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate column name") ||
+		strings.Contains(msg, "already exists") ||
+		strings.Contains(msg, "duplicate key name")
 }

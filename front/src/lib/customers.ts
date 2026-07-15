@@ -22,12 +22,26 @@ const localSaveCustomers = (customers: Customer[]) => {
    Customer — type + localStorage helpers
 ──────────────────────────────────────────────────────────────────────────── */
 
+export type CustomerAddress = {
+  id: string;
+  customerId: string;
+  title: string;
+  fullName: string;
+  phone: string;
+  province: string;
+  city: string;
+  address: string;
+  postalCode: string;
+  isDefault: boolean;
+};
+
 export type Customer = {
   id: string;
   name: string;
   phone: string;
   address: string;
   notes: string;
+  addresses?: CustomerAddress[];
 };
 
 export const getCustomers = async (): Promise<Customer[]> => {

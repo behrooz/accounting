@@ -57,6 +57,9 @@ export type Invoice = {
   status: "draft" | "confirmed";
   /** dashboard = created in panel; storefront = online shop order */
   source?: "dashboard" | "storefront" | string;
+  shippingMethod?: string;
+  shippingFee?: number;
+  paymentMethod?: string;
   createdAt: string;
 };
 

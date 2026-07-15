@@ -10,7 +10,16 @@ import (
 func ListCustomers(db *sqlx.DB) ([]models.Customer, error) {
 	var cs []models.Customer
 	err := db.Select(&cs, "SELECT id, name, phone, address, notes FROM customers ORDER BY updated_at DESC")
-	return cs, err
+	if err != nil {
+		return nil, err
+	}
+	if err := AttachAddresses(db, cs); err != nil {
+		// Keep customer list working even if address table is mid-migration.
+		for i := range cs {
+			cs[i].Addresses = []models.CustomerAddress{}
+		}
+	}
+	return cs, nil
 }
 
 func UpsertCustomer(db *sqlx.DB, c models.Customer) error {

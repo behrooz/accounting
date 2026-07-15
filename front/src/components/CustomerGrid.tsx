@@ -79,11 +79,23 @@ const COLUMN_DEFS: ColDef<Customer>[] = [
   },
   {
     field: "address",
-    headerName: "آدرس",
+    headerName: "آدرس پیش‌فرض",
     editable: true,
     flex: 2,
     minWidth: 160,
     filter: "agTextColumnFilter",
+  },
+  {
+    headerName: "آدرس‌ها",
+    editable: false,
+    width: 100,
+    valueGetter: (p) => (p.data?.addresses?.length ?? 0),
+    valueFormatter: (p) => {
+      const n = Number(p.value) || 0;
+      if (!n) return "—";
+      const def = p.data?.addresses?.find((a) => a.isDefault);
+      return def ? `${n} (پیش‌فرض)` : String(n);
+    },
   },
   {
     field: "notes",

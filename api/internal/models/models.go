@@ -56,11 +56,25 @@ type ProductVariant struct {
 }
 
 type Customer struct {
-	ID      string `db:"id" json:"id"`
-	Name    string `db:"name" json:"name"`
-	Phone   string `db:"phone" json:"phone"`
-	Address string `db:"address" json:"address"`
-	Notes   string `db:"notes" json:"notes"`
+	ID        string             `db:"id" json:"id"`
+	Name      string             `db:"name" json:"name"`
+	Phone     string             `db:"phone" json:"phone"`
+	Address   string             `db:"address" json:"address"`
+	Notes     string             `db:"notes" json:"notes"`
+	Addresses []CustomerAddress  `db:"-" json:"addresses,omitempty"`
+}
+
+type CustomerAddress struct {
+	ID         string `db:"id" json:"id"`
+	CustomerID string `db:"customer_id" json:"customerId"`
+	Title      string `db:"title" json:"title"`
+	FullName   string `db:"full_name" json:"fullName"`
+	Phone      string `db:"phone" json:"phone"`
+	Province   string `db:"province" json:"province"`
+	City       string `db:"city" json:"city"`
+	Address    string `db:"address" json:"address"`
+	PostalCode string `db:"postal_code" json:"postalCode"`
+	IsDefault  bool   `db:"is_default" json:"isDefault"`
 }
 
 type Invoice struct {
@@ -78,6 +92,9 @@ type Invoice struct {
 	Total           int64         `json:"total"`
 	Status          string        `json:"status"` // draft|confirmed
 	Source          string        `json:"source"` // dashboard|storefront
+	ShippingMethod  string        `json:"shippingMethod"`
+	ShippingFee     int64         `json:"shippingFee"`
+	PaymentMethod   string        `json:"paymentMethod"`
 	CreatedAt       string        `json:"createdAt"`
 }
 

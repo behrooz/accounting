@@ -46,6 +46,10 @@ func main() {
 	if err := migrate.Apply(database, migrationsDir); err != nil {
 		panic(err)
 	}
+	// Safety net when older environments missed ALTER TABLE statements
+	if err := repo.EnsureStorefrontSchema(database); err != nil {
+		panic(err)
+	}
 
 	// seed default admin (admin / 123456)
 	hash, _ := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
@@ -317,6 +321,97 @@ func main() {
 		c.JSON(http.StatusCreated, inv)
 	})
 
+	// Storefront customer + addresses by phone (no JWT)
+	api.GET("/store/customer", func(c *gin.Context) {
+		phone := strings.TrimSpace(c.Query("phone"))
+		if phone == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "phone required"})
+			return
+		}
+		cust, err := repo.FindCustomerByPhone(database, phone)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		addrs, _ := repo.ListAddresses(database, cust.ID)
+		cust.Addresses = addrs
+		c.JSON(http.StatusOK, cust)
+	})
+	api.POST("/store/addresses", func(c *gin.Context) {
+		var body struct {
+			Phone   string                 `json:"phone"`
+			Name    string                 `json:"name"`
+			Address models.CustomerAddress `json:"address"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Phone) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "phone and address required"})
+			return
+		}
+		cust, err := repo.EnsureCustomerByPhone(database, body.Name, body.Phone, "مشتری فروشگاه آنلاین")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		a := body.Address
+		a.CustomerID = cust.ID
+		if a.ID == "" {
+			a.ID = repo.NewID()
+		}
+		if a.Phone == "" {
+			a.Phone = body.Phone
+		}
+		if a.FullName == "" {
+			a.FullName = body.Name
+		}
+		if err := repo.UpsertAddress(database, a); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		addrs, _ := repo.ListAddresses(database, cust.ID)
+		cust.Addresses = addrs
+		c.JSON(http.StatusCreated, cust)
+	})
+	api.PUT("/store/addresses/:id/default", func(c *gin.Context) {
+		var body struct {
+			Phone string `json:"phone"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Phone) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "phone required"})
+			return
+		}
+		cust, err := repo.FindCustomerByPhone(database, body.Phone)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "customer not found"})
+			return
+		}
+		if err := repo.SetDefaultAddress(database, cust.ID, c.Param("id")); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		addrs, _ := repo.ListAddresses(database, cust.ID)
+		cust.Addresses = addrs
+		c.JSON(http.StatusOK, cust)
+	})
+	api.DELETE("/store/addresses/:id", func(c *gin.Context) {
+		phone := strings.TrimSpace(c.Query("phone"))
+		if phone == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "phone required"})
+			return
+		}
+		cust, err := repo.FindCustomerByPhone(database, phone)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "customer not found"})
+			return
+		}
+		a, err := repo.GetAddress(database, c.Param("id"))
+		if err != nil || a.CustomerID != cust.ID {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		_ = repo.DeleteAddress(database, a.ID)
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
 	// Products (write ops auth)
 	authed.POST("/products", func(c *gin.Context) {
 		var p models.Product
@@ -394,7 +489,7 @@ func main() {
 	authed.GET("/invoices", func(c *gin.Context) {
 		invs, err := repo.ListInvoices(database)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error", "detail": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, invs)

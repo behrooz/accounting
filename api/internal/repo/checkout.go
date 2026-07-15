@@ -1,9 +1,7 @@
 package repo
 
 import (
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,14 +11,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 )
-
-// NewID returns a random UUID-like id (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).
-func NewID() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	s := hex.EncodeToString(b)
-	return s[0:8] + "-" + s[8:12] + "-" + s[12:16] + "-" + s[16:20] + "-" + s[20:32]
-}
 
 type CheckoutCustomer struct {
 	Name    string `json:"name"`
@@ -34,10 +24,28 @@ type CheckoutItem struct {
 	Quantity  int    `json:"quantity"`
 }
 
+type CheckoutAddressInput struct {
+	ID         string `json:"id"`
+	Title      string `json:"title"`
+	FullName   string `json:"fullName"`
+	Phone      string `json:"phone"`
+	Province   string `json:"province"`
+	City       string `json:"city"`
+	Address    string `json:"address"`
+	PostalCode string `json:"postalCode"`
+	IsDefault  bool   `json:"isDefault"`
+	Save       bool   `json:"save"`
+}
+
 type CheckoutRequest struct {
-	Customer CheckoutCustomer `json:"customer"`
-	Items    []CheckoutItem   `json:"items"`
-	Notes    string           `json:"notes"`
+	Customer       CheckoutCustomer     `json:"customer"`
+	AddressID      string               `json:"addressId"`
+	Address        CheckoutAddressInput `json:"address"`
+	Items          []CheckoutItem       `json:"items"`
+	Notes          string               `json:"notes"`
+	ShippingMethod string               `json:"shippingMethod"`
+	ShippingFee    int64                `json:"shippingFee"`
+	PaymentMethod  string               `json:"paymentMethod"`
 }
 
 func FindCustomerByPhone(db *sqlx.DB, phone string) (*models.Customer, error) {
@@ -53,12 +61,48 @@ func FindCustomerByPhone(db *sqlx.DB, phone string) (*models.Customer, error) {
 	return &c, nil
 }
 
+func resolveShipping(method string, fee int64) (string, int64) {
+	m := strings.TrimSpace(method)
+	switch m {
+	case "tipax":
+		return "تیپاکس (کرایه در مقصد)", 0
+	case "pishtaz", "":
+		if fee <= 0 {
+			fee = 149000
+		}
+		return "پست پیشتاز", fee
+	default:
+		if fee < 0 {
+			fee = 0
+		}
+		return m, fee
+	}
+}
+
+func resolvePayment(method string) string {
+	switch strings.TrimSpace(method) {
+	case "zarinpal":
+		return "درگاه زرین‌پال"
+	case "card":
+		return "کارت به کارت"
+	case "saman", "":
+		return "درگاه سامان"
+	default:
+		return method
+	}
+}
+
 // CreateStorefrontOrder validates cart lines against DB products/variants,
-// upserts the customer, and creates a confirmed invoice with source=storefront.
+// upserts the customer/address, and creates a confirmed invoice with source=storefront.
 func CreateStorefrontOrder(db *sqlx.DB, req CheckoutRequest) (*models.Invoice, error) {
 	name := strings.TrimSpace(req.Customer.Name)
 	phone := strings.TrimSpace(req.Customer.Phone)
-	address := strings.TrimSpace(req.Customer.Address)
+	if name == "" {
+		name = strings.TrimSpace(req.Address.FullName)
+	}
+	if phone == "" {
+		phone = strings.TrimSpace(req.Address.Phone)
+	}
 	if name == "" || phone == "" {
 		return nil, errors.New("name and phone required")
 	}
@@ -66,13 +110,10 @@ func CreateStorefrontOrder(db *sqlx.DB, req CheckoutRequest) (*models.Invoice, e
 		return nil, errors.New("items required")
 	}
 
-	type line struct {
-		item         models.InvoiceItem
-		variantQty   int
-		variantID    string
-	}
+	shipLabel, shipFee := resolveShipping(req.ShippingMethod, req.ShippingFee)
+	payLabel := resolvePayment(req.PaymentMethod)
 
-	lines := make([]line, 0, len(req.Items))
+	lines := make([]models.InvoiceItem, 0, len(req.Items))
 	var subtotal int64
 
 	for _, raw := range req.Items {
@@ -120,73 +161,106 @@ func CreateStorefrontOrder(db *sqlx.DB, req CheckoutRequest) (*models.Invoice, e
 
 		total := unit * int64(qty)
 		subtotal += total
-		lines = append(lines, line{
-			item: models.InvoiceItem{
-				ID:           NewID(),
-				ProductID:    p.ID,
-				VariantID:    v.ID,
-				ProductName:  p.Name,
-				VariantLabel: label,
-				SKU:          v.SKU,
-				UnitPrice:    unit,
-				Quantity:     qty,
-				Total:        total,
-			},
-			variantQty: v.Quantity,
-			variantID:  v.ID,
+		lines = append(lines, models.InvoiceItem{
+			ID:           NewID(),
+			ProductID:    p.ID,
+			VariantID:    v.ID,
+			ProductName:  p.Name,
+			VariantLabel: label,
+			SKU:          v.SKU,
+			UnitPrice:    unit,
+			Quantity:     qty,
+			Total:        total,
 		})
 	}
 
-	cust, err := FindCustomerByPhone(db, phone)
-	customerID := NewID()
-	if err == nil && cust != nil {
-		customerID = cust.ID
-	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	customer, err := EnsureCustomerByPhone(db, name, phone, "مشتری فروشگاه آنلاین")
+	if err != nil {
 		return nil, err
 	}
 
-	customer := models.Customer{
-		ID:      customerID,
-		Name:    name,
-		Phone:   phone,
-		Address: address,
-		Notes:   "مشتری فروشگاه آنلاین",
+	addressLine := strings.TrimSpace(req.Customer.Address)
+	if req.AddressID != "" {
+		a, err := GetAddress(db, req.AddressID)
+		if err != nil {
+			return nil, errors.New("address not found")
+		}
+		if a.CustomerID != customer.ID {
+			return nil, errors.New("address does not belong to customer")
+		}
+		addressLine = FormatAddressLine(*a)
+		_ = SetDefaultAddress(db, customer.ID, a.ID)
+	} else {
+		addr := models.CustomerAddress{
+			ID:         strings.TrimSpace(req.Address.ID),
+			CustomerID: customer.ID,
+			Title:      strings.TrimSpace(req.Address.Title),
+			FullName:   strings.TrimSpace(req.Address.FullName),
+			Phone:      strings.TrimSpace(req.Address.Phone),
+			Province:   strings.TrimSpace(req.Address.Province),
+			City:       strings.TrimSpace(req.Address.City),
+			Address:    strings.TrimSpace(req.Address.Address),
+			PostalCode: strings.TrimSpace(req.Address.PostalCode),
+			IsDefault:  true,
+		}
+		if addr.FullName == "" {
+			addr.FullName = name
+		}
+		if addr.Phone == "" {
+			addr.Phone = phone
+		}
+		if addr.Address == "" {
+			return nil, errors.New("address required")
+		}
+		addressLine = FormatAddressLine(addr)
+		if req.Address.Save || req.Address.IsDefault {
+			if addr.ID == "" {
+				addr.ID = NewID()
+			}
+			if addr.Title == "" {
+				addr.Title = "آدرس اصلی"
+			}
+			if err := UpsertAddress(db, addr); err != nil {
+				return nil, err
+			}
+		}
 	}
-	if err := UpsertCustomer(db, customer); err != nil {
-		return nil, err
-	}
+
+	customer.Name = name
+	customer.Phone = phone
+	customer.Address = addressLine
+	_ = UpsertCustomer(db, *customer)
 
 	number, err := NextInvoiceNumber(db)
 	if err != nil {
 		return nil, err
 	}
 
-	now := time.Now()
-	items := make([]models.InvoiceItem, 0, len(lines))
-	for _, l := range lines {
-		items = append(items, l.item)
-	}
-
 	notes := strings.TrimSpace(req.Notes)
 	if notes == "" {
 		notes = "سفارش آنلاین فروشگاه"
 	}
+	notes = notes + " | ارسال: " + shipLabel + " | پرداخت: " + payLabel
 
+	now := time.Now()
 	inv := models.Invoice{
 		ID:              NewID(),
 		Number:          number,
 		Date:            now.Format("2006-01-02"),
-		CustomerID:      customerID,
+		CustomerID:      customer.ID,
 		CustomerName:    name,
 		CustomerPhone:   phone,
-		CustomerAddress: address,
-		Items:           items,
+		CustomerAddress: addressLine,
+		Items:           lines,
 		Notes:           notes,
 		Discount:        0,
 		Subtotal:        subtotal,
-		Total:           subtotal,
+		Total:           subtotal + shipFee,
 		Status:          "confirmed",
 		Source:          "storefront",
+		ShippingMethod:  shipLabel,
+		ShippingFee:     shipFee,
+		PaymentMethod:   payLabel,
 		CreatedAt:       now.Format(time.RFC3339),
 	}
 
@@ -195,10 +269,11 @@ func CreateStorefrontOrder(db *sqlx.DB, req CheckoutRequest) (*models.Invoice, e
 		_, err := tx.Exec(
 			`INSERT INTO invoices(
 				id, number, date, customer_id, customer_name, customer_phone, customer_address,
-				notes, discount, subtotal, total, status, source, created_at
-			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				notes, discount, subtotal, total, status, source, shipping_method, shipping_fee, payment_method, created_at
+			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			inv.ID, inv.Number, inv.Date, inv.CustomerID, inv.CustomerName, inv.CustomerPhone, inv.CustomerAddress,
-			inv.Notes, inv.Discount, inv.Subtotal, inv.Total, inv.Status, inv.Source, createdAt,
+			inv.Notes, inv.Discount, inv.Subtotal, inv.Total, inv.Status, inv.Source,
+			inv.ShippingMethod, inv.ShippingFee, inv.PaymentMethod, createdAt,
 		)
 		if err != nil {
 			return err
@@ -215,7 +290,6 @@ func CreateStorefrontOrder(db *sqlx.DB, req CheckoutRequest) (*models.Invoice, e
 			if err != nil {
 				return err
 			}
-			// Decrement stock
 			res, err := tx.Exec(
 				`UPDATE product_variants SET quantity = quantity - ? WHERE id=? AND quantity >= ?`,
 				it.Quantity, it.VariantID, it.Quantity,

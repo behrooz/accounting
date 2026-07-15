@@ -644,29 +644,6 @@
     );
   }
 
-  function ensureCheckoutModal() {
-    if ($("#checkoutModal").length) return;
-    $("body").append(
-      '<div class="checkout-modal" id="checkoutModal" hidden>' +
-        '<div class="checkout-panel" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">' +
-        '<div class="checkout-head">' +
-        '<h2 id="checkoutTitle">ثبت سفارش</h2>' +
-        '<button type="button" class="checkout-close" id="checkoutClose" aria-label="بستن">×</button>' +
-        "</div>" +
-        '<p class="checkout-hint">مشخصات انتخاب‌شده همراه سفارش ثبت می‌شود.</p>' +
-        '<div class="checkout-summary" id="checkoutSummary"></div>' +
-        '<form id="checkoutForm" class="checkout-form">' +
-        '<label>نام و نام خانوادگی<input name="name" required autocomplete="name" /></label>' +
-        '<label>شماره موبایل<input name="phone" type="tel" required autocomplete="tel" inputmode="tel" placeholder="09xxxxxxxxx" /></label>' +
-        '<label>آدرس<textarea name="address" rows="3" required autocomplete="street-address"></textarea></label>' +
-        '<label>توضیحات (اختیاری)<textarea name="notes" rows="2"></textarea></label>' +
-        '<p class="checkout-error" id="checkoutError" hidden></p>' +
-        '<button type="submit" class="btn-red checkout-submit" id="checkoutSubmit">ثبت و صدور فاکتور</button>' +
-        "</form>" +
-        "</div></div>"
-    );
-  }
-
   function openCheckout() {
     var items = getCart();
     if (!items.length) {
@@ -682,95 +659,16 @@
       );
       return;
     }
-    ensureCheckoutModal();
-    $("#checkoutSummary").html(
-      items
-        .map(function (i) {
-          return (
-            "<div class=\"checkout-sum-line\"><strong>" +
-            escapeHtml(cartLineTitle(i)) +
-            "</strong><span>× " +
-            i.qty.toLocaleString("fa-IR") +
-            " — " +
-            formatPrice(i.price * i.qty) +
-            "</span></div>"
-          );
-        })
-        .join("") +
-        '<div class="checkout-sum-total"><span>جمع</span><strong>' +
-        formatPrice(cartTotal()) +
-        "</strong></div>"
-    );
-    $("#checkoutError").prop("hidden", true).text("");
-    $("#checkoutModal").prop("hidden", false);
-    closeCart();
-    $("#overlay").prop("hidden", false);
+    window.location.href = "checkout.html";
   }
 
   function closeCheckout() {
     $("#checkoutModal").prop("hidden", true);
-    if (!$("#cartDrawer").hasClass("is-open") && !$("#menuDrawer").hasClass("is-open")) {
-      $("#overlay").prop("hidden", true);
-    }
   }
 
   function submitCheckout(e) {
-    e.preventDefault();
-    var $form = $("#checkoutForm");
-    var name = String($form.find('[name="name"]').val() || "").trim();
-    var phone = String($form.find('[name="phone"]').val() || "").trim();
-    var address = String($form.find('[name="address"]').val() || "").trim();
-    var notes = String($form.find('[name="notes"]').val() || "").trim();
-    var $err = $("#checkoutError");
-    var $btn = $("#checkoutSubmit");
-
-    if (!name || !phone || !address) {
-      $err.text("نام، موبایل و آدرس الزامی است.").prop("hidden", false);
-      return;
-    }
-
-    var payload = {
-      customer: { name: name, phone: phone, address: address },
-      notes: notes,
-      items: getCart().map(function (i) {
-        return {
-          productId: i.productId || i.id,
-          variantId: i.variantId,
-          quantity: i.qty
-        };
-      })
-    };
-
-    var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
-    $btn.prop("disabled", true).text("در حال ثبت...");
-    $err.prop("hidden", true);
-
-    $.ajax({
-      url: base + "/checkout",
-      method: "POST",
-      contentType: "application/json",
-      data: JSON.stringify(payload),
-      dataType: "json"
-    })
-      .done(function (inv) {
-        saveCart([]);
-        closeCheckout();
-        alert(
-          "سفارش ثبت شد.\nشماره فاکتور: " +
-            (inv && inv.number ? inv.number : "") +
-            "\nدر داشبورد → فاکتورها قابل مشاهده است."
-        );
-      })
-      .fail(function (xhr) {
-        var msg = "ثبت سفارش ناموفق بود.";
-        try {
-          msg = (xhr.responseJSON && xhr.responseJSON.error) || msg;
-        } catch (err) {}
-        $err.text(msg).prop("hidden", false);
-      })
-      .always(function () {
-        $btn.prop("disabled", false).text("ثبت و صدور فاکتور");
-      });
+    if (e && e.preventDefault) e.preventDefault();
+    openCheckout();
   }
 
   function colorOptionMeta(product) {
