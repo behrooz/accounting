@@ -100,7 +100,7 @@ env:
   - name: APP_PORT
     value: "8080"
   - name: APP_CORS_ORIGIN
-    value: "https://ns-xp45-default-accounting-front.bugx.ir"
+    value: "https://ns-xp45-default-accounting-front.bugx.ir,https://ns-xp45-default-accounting-web.bugx.ir"
   - name: TZ
     value: "Asia/Tehran"
   - name: MYSQL_DSN

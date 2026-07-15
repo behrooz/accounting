@@ -1,0 +1,15 @@
+apiVersion: v2
+name: accounting-web
+description: A Helm chart for accounting-web — static storefront (آبرنگ)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - accounting
+  - storefront
+  - web
+maintainers:
+  - name: accounting-team
+home: https://github.com/behrooz/accounting
+sources:
+  - https://github.com/behrooz/accounting

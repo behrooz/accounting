@@ -94,27 +94,75 @@ const COLUMN_DEFS: ColDef<Invoice>[] = [
 
 const DEFAULT_COL_DEF: ColDef<Invoice> = { sortable: true, resizable: true, filter: true };
 
+type SalesFilters = {
+  dateFrom: string;
+  dateTo: string;
+  invoiceNumber: string;
+  customerName: string;
+};
+
+const emptyFilters = (): SalesFilters => ({
+  dateFrom: "",
+  dateTo: "",
+  invoiceNumber: "",
+  customerName: "",
+});
+
+function applySalesFilters(invs: Invoice[], f: SalesFilters): Invoice[] {
+  const numQ = f.invoiceNumber.trim().toLowerCase();
+  const nameQ = f.customerName.trim().toLowerCase();
+  return invs.filter((inv) => {
+    if (f.dateFrom && inv.date < f.dateFrom) return false;
+    if (f.dateTo && inv.date > f.dateTo) return false;
+    if (numQ && !(inv.number || "").toLowerCase().includes(numQ)) return false;
+    if (nameQ && !(inv.customerName || "").toLowerCase().includes(nameQ)) return false;
+    return true;
+  });
+}
+
 export default function SalesPage() {
   const router = useRouter();
   const gridRef = useRef<AgGridReact<Invoice>>(null);
   const dataRef = useRef<Invoice[]>([]);
   const [rowData, setRowData] = useState<Invoice[]>([]);
-  const [quickFilter, setQuickFilter] = useState("");
+  const [filters, setFilters] = useState<SalesFilters>(emptyFilters);
+
+  const applyFilters = useCallback((all: Invoice[], next: SalesFilters) => {
+    setRowData(applySalesFilters(all, next));
+  }, []);
 
   useEffect(() => {
     const load = async () => {
       const invs = await getInvoices();
       dataRef.current = invs;
-      setRowData(invs);
+      applyFilters(invs, filters);
     };
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load only
   }, []);
 
   const reload = useCallback(async () => {
     const invs = await getInvoices();
     dataRef.current = invs;
-    setRowData([...invs]);
-  }, []);
+    applyFilters(invs, filters);
+  }, [applyFilters, filters]);
+
+  const updateFilter = useCallback(
+    <K extends keyof SalesFilters>(key: K, value: SalesFilters[K]) => {
+      setFilters((prev) => {
+        const next = { ...prev, [key]: value };
+        applyFilters(dataRef.current, next);
+        return next;
+      });
+    },
+    [applyFilters],
+  );
+
+  const clearFilters = useCallback(() => {
+    const next = emptyFilters();
+    setFilters(next);
+    applyFilters(dataRef.current, next);
+  }, [applyFilters]);
 
   const handleEdit = useCallback((id: string) => router.push(`/sales/${id}`), [router]);
 
@@ -130,10 +178,18 @@ export default function SalesPage() {
 
   const gridCtx: GridCtx = { handleEdit, handlePrint, handleDelete };
 
-  // Total of all confirmed invoices
   const confirmedTotal = rowData
     .filter((i) => i.status === "confirmed")
     .reduce((s, i) => s + i.total, 0);
+
+  const hasActiveFilters =
+    !!filters.dateFrom ||
+    !!filters.dateTo ||
+    !!filters.invoiceNumber.trim() ||
+    !!filters.customerName.trim();
+
+  const inputCls =
+    "rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm text-[#16191f] placeholder:text-[#879596] outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]";
 
   return (
     <div className="flex w-full flex-col gap-4 p-6">
@@ -141,31 +197,91 @@ export default function SalesPage() {
         <div>
           <h1 className="text-xl font-bold text-[#16191f]">فاکتورها</h1>
           <p className="mt-0.5 text-sm text-[#545b64]">
-            مجموع فروش تأیید‌شده: <span className="font-semibold text-[#1d8102]">{fa(confirmedTotal)} تومان</span>
+            مجموع فروش تأیید‌شده
+            {hasActiveFilters ? " (فیلتر‌شده)" : ""}
+            :{" "}
+            <span className="font-semibold text-[#1d8102]">{fa(confirmedTotal)} تومان</span>
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input type="search" placeholder="جستجو…" value={quickFilter}
-            onChange={(e) => setQuickFilter(e.target.value)}
-            className="w-44 rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm text-[#16191f] placeholder:text-[#879596] outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]" />
-          <button onClick={() => router.push("/sales/new")}
-            className="rounded bg-[#ec7211] px-4 py-2 text-sm font-medium text-white hover:bg-[#eb5f07] transition">
-            + فاکتور جدید
+        <button
+          onClick={() => router.push("/sales/new")}
+          className="rounded bg-[#ec7211] px-4 py-2 text-sm font-medium text-white hover:bg-[#eb5f07] transition"
+        >
+          + فاکتور جدید
+        </button>
+      </div>
+
+      <div className="rounded border border-[#d5dbdb] bg-white p-3 shadow-sm">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex min-w-[140px] flex-col gap-1 text-xs font-medium text-[#545b64]">
+            از تاریخ
+            <input
+              type="date"
+              value={filters.dateFrom}
+              onChange={(e) => updateFilter("dateFrom", e.target.value)}
+              className={inputCls}
+            />
+          </label>
+          <label className="flex min-w-[140px] flex-col gap-1 text-xs font-medium text-[#545b64]">
+            تا تاریخ
+            <input
+              type="date"
+              value={filters.dateTo}
+              onChange={(e) => updateFilter("dateTo", e.target.value)}
+              className={inputCls}
+            />
+          </label>
+          <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-xs font-medium text-[#545b64]">
+            شماره فاکتور
+            <input
+              type="search"
+              placeholder="مثلاً INV-0003"
+              value={filters.invoiceNumber}
+              onChange={(e) => updateFilter("invoiceNumber", e.target.value)}
+              className={inputCls}
+            />
+          </label>
+          <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-xs font-medium text-[#545b64]">
+            نام مشتری
+            <input
+              type="search"
+              placeholder="جستجوی مشتری…"
+              value={filters.customerName}
+              onChange={(e) => updateFilter("customerName", e.target.value)}
+              className={inputCls}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={!hasActiveFilters}
+            className="rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm font-medium text-[#545b64] hover:bg-[#f2f3f3] transition disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            پاک کردن فیلتر
           </button>
         </div>
       </div>
 
       <div className="overflow-hidden rounded border border-[#d5dbdb] shadow-sm" style={{ height: 540 }}>
         <AgGridReact<Invoice>
-          ref={gridRef} theme={gridTheme} rowData={rowData}
-          columnDefs={COLUMN_DEFS} defaultColDef={DEFAULT_COL_DEF}
-          getRowId={getRowId} quickFilterText={quickFilter}
-          enableRtl={true} pagination={true} paginationPageSize={20}
-          animateRows={true} context={gridCtx}
+          ref={gridRef}
+          theme={gridTheme}
+          rowData={rowData}
+          columnDefs={COLUMN_DEFS}
+          defaultColDef={DEFAULT_COL_DEF}
+          getRowId={getRowId}
+          enableRtl={true}
+          pagination={true}
+          paginationPageSize={20}
+          animateRows={true}
+          context={gridCtx}
           noRowsOverlayComponent={NoRowsOverlay}
         />
       </div>
-      <p className="text-xs text-[#879596]">{rowData.length} فاکتور ثبت‌شده</p>
+      <p className="text-xs text-[#879596]">
+        {rowData.length} فاکتور
+        {hasActiveFilters ? ` از ${dataRef.current.length}` : " ثبت‌شده"}
+      </p>
     </div>
   );
 }

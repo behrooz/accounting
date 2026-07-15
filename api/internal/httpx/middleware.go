@@ -67,7 +67,7 @@ func Cors(originsCSV string) gin.HandlerFunc {
 			allowAny = true
 			continue
 		}
-		allowed[o] = true
+		allowed[strings.TrimRight(o, "/")] = true
 	}
 	// Empty / unset list → allow any (local storefront + dashboard)
 	if len(allowed) == 0 {
@@ -76,19 +76,15 @@ func Cors(originsCSV string) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		origin := strings.TrimSpace(c.GetHeader("Origin"))
+		origin = strings.TrimRight(origin, "/")
 
 		allow := ""
-		switch {
-		case origin != "" && (allowAny || allowed[origin] || isLocalDevOrigin(origin)):
-			// Always echo Origin — browsers reject "*" when credentials are used.
+		if origin != "" && (allowAny || allowed[origin] || isLocalDevOrigin(origin) || isBugxOrigin(origin, allowed)) {
+			// Echo request Origin — browsers reject "*" with credentials,
+			// and require an exact match with the page origin.
 			allow = origin
-		case origin == "" && allowAny:
+		} else if origin == "" && allowAny {
 			allow = "*"
-		case origin != "" && len(allowed) == 1 && !allowAny:
-			for o := range allowed {
-				allow = o
-				break
-			}
 		}
 
 		if allow != "" {
@@ -121,4 +117,28 @@ func isLocalDevOrigin(origin string) bool {
 	default:
 		return false
 	}
+}
+
+// isBugxOrigin allows sibling *.bugx.ir hosts when any bugx.ir origin is configured
+// (front + web + future apps share the API).
+func isBugxOrigin(origin string, allowed map[string]bool) bool {
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	if !strings.HasSuffix(host, ".bugx.ir") && host != "bugx.ir" {
+		return false
+	}
+	for o := range allowed {
+		au, err := url.Parse(o)
+		if err != nil {
+			continue
+		}
+		ah := strings.ToLower(au.Hostname())
+		if ah == "bugx.ir" || strings.HasSuffix(ah, ".bugx.ir") {
+			return true
+		}
+	}
+	return false
 }
