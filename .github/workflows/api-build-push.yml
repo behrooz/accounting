@@ -25,11 +25,13 @@ jobs:
               insecure = true
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./api
           file: ./api/Dockerfile
           push: true
+          provenance: false
+          sbom: false
           tags: |
             188.132.232.168:30836/accounting-api:${{ github.run_number }}
             188.132.232.168:30836/accounting-api:latest

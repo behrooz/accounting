@@ -25,11 +25,14 @@ jobs:
               insecure = true
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./web
           file: ./web/Dockerfile
           push: true
+          # Private registry rejects OCI provenance/SBOM attestation manifests
+          provenance: false
+          sbom: false
           tags: |
             188.132.232.168:30836/accounting-web:${{ github.run_number }}
             188.132.232.168:30836/accounting-web:latest
