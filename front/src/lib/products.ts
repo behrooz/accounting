@@ -51,7 +51,7 @@ export type ProductVariant = {
   salePrice: number;
   quantity: number;
   attributeValues: Record<string, string>;
-  /** Base-64 compressed thumbnail for this variant (optional) */
+  /** Selling-price image path relative to API, e.g. assets/product/xxx.jpg */
   image?: string;
 };
 
@@ -61,7 +61,7 @@ export type Product = {
   name: string;
   /** Optional product category (storefront / filtering) */
   categoryId?: string | null;
-  /** Product gallery images (bulk upload, not tied to attributes) */
+  /** Gallery image paths under assets/product (not base64) */
   images?: string[];
   attributes: ProductAttribute[];
   variants: ProductVariant[];

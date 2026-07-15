@@ -3,10 +3,24 @@
 (function () {
   if (window.ABERANG_API_BASE_URL) {
     window.ABERANG_API_BASE_URL = String(window.ABERANG_API_BASE_URL).replace(/\/$/, "");
-    return;
+  } else {
+    var host = (window.location && window.location.hostname) || "127.0.0.1";
+    if (!host || host === "null") host = "127.0.0.1";
+    window.ABERANG_API_BASE_URL = ("http://" + host + ":8080/api").replace(/\/$/, "");
   }
-  var host = (window.location && window.location.hostname) || "127.0.0.1";
-  if (!host || host === "null") host = "127.0.0.1";
-  // Same hostname as the page (avoids localhost vs 127.0.0.1 vs ::1 mismatch).
-  window.ABERANG_API_BASE_URL = ("http://" + host + ":8080/api").replace(/\/$/, "");
+  window.ABERANG_API_ORIGIN = String(window.ABERANG_API_BASE_URL).replace(/\/api\/?$/, "");
+  window.ABERANG_MEDIA_URL = function (path) {
+    if (!path) return "";
+    var s = String(path).trim();
+    if (!s) return "";
+    if (
+      s.indexOf("data:") === 0 ||
+      s.indexOf("http://") === 0 ||
+      s.indexOf("https://") === 0 ||
+      s.indexOf("blob:") === 0
+    ) {
+      return s;
+    }
+    return window.ABERANG_API_ORIGIN + "/" + s.replace(/^\//, "");
+  };
 })();

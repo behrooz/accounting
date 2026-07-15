@@ -26,6 +26,8 @@ ENV APP_ENV=prod \
     APP_PORT=8080 \
     TZ=Asia/Tehran
 
+RUN mkdir -p /app/assets/product && chown -R appuser:appuser /app/assets
+
 EXPOSE 8080
 
 USER appuser

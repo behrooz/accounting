@@ -9,6 +9,7 @@ import {
   productMaxPrice,
   type Product,
 } from "@/lib/products";
+import { mediaUrl } from "@/lib/media";
 
 const PLACEHOLDER =
   "https://images.unsplash.com/photo-1520975919572-9aebc6a48b6b?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=4c1b8f9b1b7d6b0b1f2a9d6e2c8f7f4a";
@@ -60,16 +61,15 @@ export default function ProductDetailPage() {
     );
 
   const gallery = (product.images ?? [])
-    .map((s) => s.trim())
+    .map((s) => mediaUrl(s))
     .filter(Boolean);
   const images = Array.from(
     new Set(
       gallery.length
         ? gallery
         : product.variants
-            .map((v) => v.image)
-            .filter((s): s is string => Boolean(s))
-            .map((s) => s!.trim()),
+            .map((v) => mediaUrl(v.image))
+            .filter(Boolean),
     ),
   );
   const slides = images.length ? images : [PLACEHOLDER];

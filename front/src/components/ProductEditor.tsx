@@ -14,31 +14,12 @@ import {
   getCategories,
   type ProductCategory,
 } from "@/lib/categories";
+import {
+  compressImageFile,
+  mediaUrl,
+  uploadProductImage,
+} from "@/lib/media";
 import VariantsGrid from "./VariantsGrid";
-
-/* ─── Image helpers ─────────────────────────────────────────────────────── */
-function compressImage(file: File, maxPx = 960): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("read failed"));
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("image decode failed"));
-      img.onload = () => {
-        const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * ratio);
-        canvas.height = Math.round(img.height * ratio);
-        canvas
-          .getContext("2d")!
-          .drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
-      };
-      img.src = e.target!.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-}
 
 /* ─── Small inline helper: tag-style option input ───────────────────────── */
 function AddOptionInput({ onAdd }: { onAdd: (label: string) => void }) {
@@ -109,13 +90,22 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
     setUploadingImages(true);
     try {
       const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
-      const compressed = await Promise.all(list.map((f) => compressImage(f)));
+      const paths: string[] = [];
+      for (const file of list) {
+        const compressed = await compressImageFile(file, 1280);
+        const uploaded = await uploadProductImage(compressed);
+        paths.push(uploaded.path);
+      }
       setProduct((p) => ({
         ...p,
-        images: [...(p.images ?? []), ...compressed],
+        images: [...(p.images ?? []), ...paths],
       }));
-    } catch {
-      alert("آپلود یک یا چند تصویر ناموفق بود.");
+    } catch (err) {
+      alert(
+        err instanceof Error
+          ? err.message
+          : "آپلود یک یا چند تصویر ناموفق بود.",
+      );
     } finally {
       setUploadingImages(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -352,11 +342,11 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {images.map((src, index) => (
                 <div
-                  key={`${index}-${src.slice(0, 32)}`}
+                  key={`${index}-${src.slice(0, 64)}`}
                   className="group relative overflow-hidden rounded border border-[#d5dbdb] bg-[#f2f3f3]"
                 >
                   <img
-                    src={src}
+                    src={mediaUrl(src)}
                     alt=""
                     className="aspect-square w-full object-cover"
                   />

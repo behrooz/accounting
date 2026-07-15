@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"accounting-api/internal/media"
 	"accounting-api/internal/models"
 
 	"github.com/jmoiron/sqlx"
@@ -193,6 +194,11 @@ func UpsertProduct(db *sqlx.DB, p models.Product) error {
 		}
 
 		// Replace attributes/options/variants/images for simplicity (matches localStorage overwrite behavior)
+		var oldImgs []string
+		_ = tx.Select(&oldImgs, `SELECT image FROM product_images WHERE product_id=?`, p.ID)
+		var oldVarImgs []sql.NullString
+		_ = tx.Select(&oldVarImgs, `SELECT image FROM product_variants WHERE product_id=?`, p.ID)
+
 		if _, err := tx.Exec("DELETE FROM product_attributes WHERE product_id=?", p.ID); err != nil {
 			return err
 		}
@@ -203,13 +209,19 @@ func UpsertProduct(db *sqlx.DB, p models.Product) error {
 			return err
 		}
 
+		kept := map[string]bool{}
 		for i, img := range p.Images {
-			if strings.TrimSpace(img) == "" {
+			path, err := media.NormalizeImageRef(img)
+			if err != nil {
+				return err
+			}
+			if path == "" {
 				continue
 			}
-			_, err := tx.Exec(
+			kept[path] = true
+			_, err = tx.Exec(
 				`INSERT INTO product_images(id, product_id, image, sort_order) VALUES(?,?,?,?)`,
-				newID(), p.ID, img, i,
+				newID(), p.ID, path, i,
 			)
 			if err != nil {
 				return err
@@ -234,12 +246,35 @@ func UpsertProduct(db *sqlx.DB, p models.Product) error {
 
 		for _, v := range p.Variants {
 			b, _ := json.Marshal(v.AttributeValues)
+			var imgPtr interface{}
+			if v.Image != nil && strings.TrimSpace(*v.Image) != "" {
+				path, err := media.NormalizeImageRef(*v.Image)
+				if err != nil {
+					return err
+				}
+				if path != "" {
+					kept[path] = true
+					imgPtr = path
+				}
+			}
 			_, err := tx.Exec(
 				`INSERT INTO product_variants(id, product_id, sku, price, sale_price, quantity, attribute_values, image) VALUES(?,?,?,?,?,?,?,?)`,
-				v.ID, p.ID, v.SKU, v.Price, v.SalePrice, v.Quantity, string(b), v.Image,
+				v.ID, p.ID, v.SKU, v.Price, v.SalePrice, v.Quantity, string(b), imgPtr,
 			)
 			if err != nil {
 				return err
+			}
+		}
+
+		// Remove orphaned files after successful replace
+		for _, old := range oldImgs {
+			if !kept[old] {
+				media.DeleteFile(old)
+			}
+		}
+		for _, ns := range oldVarImgs {
+			if ns.Valid && !kept[ns.String] {
+				media.DeleteFile(ns.String)
 			}
 		}
 
@@ -248,8 +283,24 @@ func UpsertProduct(db *sqlx.DB, p models.Product) error {
 }
 
 func DeleteProduct(db *sqlx.DB, id string) error {
+	var imgs []string
+	_ = db.Select(&imgs, `SELECT image FROM product_images WHERE product_id=?`, id)
+	var varImgs []sql.NullString
+	_ = db.Select(&varImgs, `SELECT image FROM product_variants WHERE product_id=?`, id)
+
 	_, err := db.Exec(`DELETE FROM products WHERE id=?`, id)
-	return err
+	if err != nil {
+		return err
+	}
+	for _, p := range imgs {
+		media.DeleteFile(p)
+	}
+	for _, ns := range varImgs {
+		if ns.Valid {
+			media.DeleteFile(ns.String)
+		}
+	}
+	return nil
 }
 
 // WithTx wrapper to avoid import cycle with internal/db. (kept minimal here)

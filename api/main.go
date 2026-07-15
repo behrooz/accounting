@@ -12,6 +12,7 @@ import (
 	"accounting-api/internal/config"
 	"accounting-api/internal/db"
 	"accounting-api/internal/httpx"
+	"accounting-api/internal/media"
 	"accounting-api/internal/migrate"
 	"accounting-api/internal/models"
 	"accounting-api/internal/repo"
@@ -34,6 +35,12 @@ func main() {
 		panic(err)
 	}
 
+	_ = media.EnsureDirs()
+	// Convert any legacy base64 blobs to files BEFORE shrinking columns in 005_*.sql
+	if err := media.MigrateBase64Images(database); err != nil {
+		panic(err)
+	}
+
 	// migrations
 	migrationsDir := filepath.Join(".", "migrations")
 	if err := migrate.Apply(database, migrationsDir); err != nil {
@@ -50,6 +57,10 @@ func main() {
 
 	r := gin.Default()
 	r.Use(httpx.Cors(cfg.CorsOrigin))
+	r.MaxMultipartMemory = 12 << 20 // 12 MiB
+
+	// Serve uploaded product images: /assets/product/<file>
+	r.Static("/assets", "./assets")
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -121,6 +132,32 @@ func main() {
 	authed.GET("/me", func(c *gin.Context) {
 		u := c.MustGet(httpx.CtxUserKey).(httpx.SessionUser)
 		c.JSON(http.StatusOK, u)
+	})
+
+	// Product image upload → assets/product/<file>, DB stores relative path
+	authed.POST("/uploads/product", func(c *gin.Context) {
+		fh, err := c.FormFile("file")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "file required"})
+			return
+		}
+		f, err := fh.Open()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "cannot open file"})
+			return
+		}
+		defer f.Close()
+
+		path, err := media.SaveUpload(f, fh.Header.Get("Content-Type"), fh.Filename)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{
+			"path":     path,
+			"url":      "/" + path,
+			"filename": filepath.Base(path),
+		})
 	})
 
 	// Users (admin only)

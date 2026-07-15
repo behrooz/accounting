@@ -16,6 +16,7 @@ import {
   themeQuartz,
 } from "ag-grid-community";
 import type { ProductAttribute, ProductVariant } from "@/lib/products";
+import { compressImageFile, mediaUrl, uploadProductImage } from "@/lib/media";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -35,28 +36,6 @@ const gridTheme = themeQuartz.withParams({
   rowHoverColor: "#f2f8fd",
   selectedRowBackgroundColor: "#e7f2f8",
 });
-
-/* ─── Image helpers ──────────────────────────────────────────────── */
-function compressImage(file: File, maxPx = 320): Promise<string> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * ratio);
-        canvas.height = Math.round(img.height * ratio);
-        canvas
-          .getContext("2d")!
-          .drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
-      };
-      img.src = e.target!.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-}
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 type ApplyField = "price" | "salePrice" | "quantity";
@@ -85,11 +64,20 @@ const ImageCellRenderer = ({ data, context }: ICellRendererParams) => {
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
-      const compressed = await compressImage(file);
-      ctx.handleImageChange(v.id, compressed);
+      try {
+        const compressed = await compressImageFile(file, 640);
+        const uploaded = await uploadProductImage(compressed);
+        ctx.handleImageChange(v.id, uploaded.path);
+      } catch (err) {
+        alert(
+          err instanceof Error ? err.message : "آپلود تصویر ناموفق بود.",
+        );
+      }
     };
     input.click();
   };
+
+  const src = mediaUrl(v.image);
 
   return (
     <div className="flex h-full items-center justify-center">
@@ -98,9 +86,9 @@ const ImageCellRenderer = ({ data, context }: ICellRendererParams) => {
         title="کلیک برای آپلود / تغییر تصویر"
         className="group relative flex h-10 w-10 items-center justify-center overflow-hidden rounded border border-dashed border-[#aab7b8] bg-[#f2f3f3] hover:border-[#0073bb] transition"
       >
-        {v.image ? (
+        {src ? (
           <>
-            <img src={v.image} alt="" className="h-full w-full object-cover" />
+            <img src={src} alt="" className="h-full w-full object-cover" />
             <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition text-white text-[10px]">
               تغییر
             </span>

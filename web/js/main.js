@@ -20,14 +20,15 @@
     renderCart();
   }
 
-  function addToCart(product, color) {
+  function addToCart(product, color, qty) {
+    var amount = Math.max(1, Number(qty) || 1);
     var items = getCart();
     var key = product.id + "::" + (color || "");
     var existing = items.find(function (i) {
       return i.key === key;
     });
     if (existing) {
-      existing.qty += 1;
+      existing.qty += amount;
     } else {
       items.push({
         key: key,
@@ -36,7 +37,7 @@
         price: product.salePrice || product.price,
         image: product.image,
         color: color || "",
-        qty: 1
+        qty: amount
       });
     }
     saveCart(items);
@@ -151,7 +152,8 @@
         return v.image;
       })
       .filter(Boolean);
-    var images = gallery.length ? gallery : variantImgs;
+    var resolve = window.ABERANG_MEDIA_URL || function (p) { return p; };
+    var images = (gallery.length ? gallery : variantImgs).map(resolve);
 
     var sellPrices = variants
       .map(function (v) {
@@ -189,6 +191,7 @@
       categoryId: api.categoryId || null,
       category: cat ? cat.slug : "",
       categorySlug: cat ? cat.slug : "",
+      categoryName: cat ? cat.name : "",
       price: price,
       salePrice: null,
       colors: colors,
@@ -210,17 +213,24 @@
     });
   }
 
+  function productHref(id) {
+    return "product.html?id=" + encodeURIComponent(id);
+  }
+
   function productCard(p) {
     var price = p.salePrice || p.price;
-    var href = "product.html?id=" + encodeURIComponent(p.id);
+    var href = productHref(p.id);
     var img = p.image || PLACEHOLDER_IMG;
+    var blank = ' target="_blank" rel="noopener noreferrer"';
     return (
       '<article class="product-card" data-id="' +
       p.id +
       '">' +
       '<a class="product-media" href="' +
       href +
-      '">' +
+      '"' +
+      blank +
+      ">" +
       '<img src="' +
       img +
       '" alt="' +
@@ -231,7 +241,9 @@
       "</a>" +
       "<h3><a href=\"" +
       href +
-      '">' +
+      '"' +
+      blank +
+      ">" +
       p.name +
       "</a></h3>" +
       '<span class="price-now">' +
@@ -239,7 +251,9 @@
       "</span>" +
       '<a class="btn-colors" href="' +
       href +
-      '">رنگبندی و جزئیات</a>' +
+      '"' +
+      blank +
+      ">رنگبندی و جزئیات</a>" +
       "</article>"
     );
   }
@@ -247,8 +261,13 @@
   function loadProducts() {
     var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
     var $home = $("#homeProducts");
+    var onProductPage = $("#productPage").length > 0;
     if ($home.length) {
       $home.html('<p class="cat-loading">در حال بارگذاری محصولات...</p>');
+    }
+    // Product detail: fetch that id directly (new tab / deep link)
+    if (onProductPage) {
+      loadProductDetail();
     }
     return $.ajax({
       url: base + "/products",
@@ -260,7 +279,7 @@
         window.ABERANG_PRODUCTS = list;
         renderHome();
         renderShop();
-        renderProductPage();
+        if (!onProductPage) renderProductPage();
       })
       .fail(function () {
         window.ABERANG_PRODUCTS = [];
@@ -270,7 +289,40 @@
           );
         }
         renderShop();
-        renderProductPage();
+        if (!onProductPage) renderProductPage();
+      });
+  }
+
+  function loadProductDetail() {
+    var $page = $("#productPage");
+    if (!$page.length) return;
+    var id = queryParam("id");
+    if (!id) {
+      $page.html(
+        '<p class="empty-state">محصول پیدا نشد. <a href="shop.html">بازگشت به فروشگاه</a></p>'
+      );
+      return;
+    }
+    $page.html('<p class="loading-msg">در حال بارگذاری...</p>');
+    var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
+    return $.ajax({
+      url: base + "/products/" + encodeURIComponent(id),
+      method: "GET",
+      dataType: "json"
+    })
+      .done(function (row) {
+        var product = mapApiProduct(row);
+        window.ABERANG_PRODUCTS = [product].concat(
+          (window.ABERANG_PRODUCTS || []).filter(function (p) {
+            return p.id !== product.id;
+          })
+        );
+        renderProductPage(product);
+      })
+      .fail(function () {
+        $page.html(
+          '<p class="empty-state">محصول پیدا نشد. <a href="shop.html">بازگشت به فروشگاه</a></p>'
+        );
       });
   }
 
@@ -403,13 +455,129 @@
     $("#shopEmpty").prop("hidden", list.length > 0);
   }
 
-  function renderProductPage() {
+  function uniqueImages(list) {
+    var out = [];
+    var seen = {};
+    (list || []).forEach(function (src) {
+      if (!src || seen[src]) return;
+      seen[src] = true;
+      out.push(src);
+    });
+    return out;
+  }
+
+  function productGalleryImages(product) {
+    var resolve = window.ABERANG_MEDIA_URL || function (p) {
+      return p;
+    };
+    var gallery = (product.images || []).slice();
+    (product.variants || []).forEach(function (v) {
+      if (v.image) gallery.push(resolve(v.image));
+    });
+    var imgs = uniqueImages(gallery);
+    return imgs.length ? imgs : [product.image || PLACEHOLDER_IMG];
+  }
+
+  function isColorAttr(attr) {
+    var n = String((attr && attr.name) || "").toLowerCase();
+    return (
+      !!(attr && attr.allowImage) ||
+      n.indexOf("رنگ") !== -1 ||
+      n.indexOf("color") !== -1
+    );
+  }
+
+  function escapeHtml(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function productAttrsHtml(product) {
+    var attrs = (product.attributes || []).filter(function (a) {
+      return !isColorAttr(a);
+    });
+    if (!attrs.length) return "";
+
+    var selectable = "";
+    var specs = "";
+
+    attrs.forEach(function (a) {
+      var opts = Array.isArray(a.options) ? a.options : [];
+      var name = escapeHtml(a.name || "ویژگی");
+      if (opts.length > 1) {
+        var chips = opts
+          .map(function (o, idx) {
+            return (
+              '<button type="button" class="js-attr pdp-swatch' +
+              (idx === 0 ? " is-active" : "") +
+              '" data-attr-id="' +
+              escapeHtml(a.id) +
+              '" data-attr-name="' +
+              name +
+              '" data-value="' +
+              escapeHtml(o.label) +
+              '"><span>' +
+              escapeHtml(o.label) +
+              "</span></button>"
+            );
+          })
+          .join("");
+        selectable +=
+          '<div class="pdp-field"><span class="pdp-label">' +
+          name +
+          '</span><div class="pdp-swatches pdp-attr-swatches">' +
+          chips +
+          "</div></div>";
+      } else {
+        var val = opts[0] && opts[0].label ? opts[0].label : "—";
+        specs +=
+          "<div class=\"pdp-spec-row\"><span class=\"pdp-spec-name\">" +
+          name +
+          '</span><span class="pdp-spec-value">' +
+          escapeHtml(val) +
+          "</span></div>";
+      }
+    });
+
+    var specsBlock = specs
+      ? '<div class="pdp-features"><div class="pdp-label">ویژگی‌های محصول</div><div class="pdp-specs">' +
+        specs +
+        "</div></div>"
+      : "";
+
+    return selectable + specsBlock;
+  }
+
+  function colorOptionMeta(product) {
+    var resolve = window.ABERANG_MEDIA_URL || function (p) {
+      return p;
+    };
+    var colors = product.colors || [];
+    return colors.map(function (label) {
+      var match = (product.variants || []).find(function (v) {
+        var vals = v.attributeValues || {};
+        return Object.keys(vals).some(function (k) {
+          return String(vals[k]) === String(label);
+        });
+      });
+      var img = match && match.image ? resolve(match.image) : "";
+      return { label: label, image: img };
+    });
+  }
+
+  function renderProductPage(forced) {
     var $page = $("#productPage");
     if (!$page.length) return;
 
-    var product = findProduct(queryParam("id"));
+    var product = forced || findProduct(queryParam("id"));
     if (!product) {
-      $page.html('<p class="empty-state">محصول پیدا نشد. <a href="shop.html">بازگشت به فروشگاه</a></p>');
+      if (!forced) return; // still loading via loadProductDetail
+      $page.html(
+        '<p class="empty-state">محصول پیدا نشد. <a href="shop.html">بازگشت به فروشگاه</a></p>'
+      );
       return;
     }
 
@@ -419,29 +587,136 @@
     var old = product.salePrice
       ? '<span class="price-old">' + formatPrice(product.price) + "</span>"
       : "";
+    var images = productGalleryImages(product);
+    var colorMeta = colorOptionMeta(product);
 
-    var colors = (product.colors || [])
-      .map(function (c, idx) {
+    var slides = images
+      .map(function (src, idx) {
         return (
-          '<button type="button" class="js-color' +
+          '<div class="pdp-slide' +
           (idx === 0 ? " is-active" : "") +
-          '" data-color="' +
-          c +
+          '" data-index="' +
+          idx +
           '">' +
-          c +
+          '<img src="' +
+          src +
+          '" alt="' +
+          product.name +
+          " — تصویر " +
+          (idx + 1) +
+          '" loading="' +
+          (idx === 0 ? "eager" : "lazy") +
+          '" onerror="this.onerror=null;this.src=\'' +
+          PLACEHOLDER_IMG +
+          '\'" />' +
+          "</div>"
+        );
+      })
+      .join("");
+
+    var thumbs = images
+      .map(function (src, idx) {
+        return (
+          '<button type="button" class="pdp-thumb' +
+          (idx === 0 ? " is-active" : "") +
+          '" data-index="' +
+          idx +
+          '" aria-label="تصویر ' +
+          (idx + 1) +
+          '">' +
+          '<img src="' +
+          src +
+          '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'' +
+          PLACEHOLDER_IMG +
+          '\'" />' +
           "</button>"
         );
       })
       .join("");
 
+    var dots = images
+      .map(function (_, idx) {
+        return (
+          '<button type="button" class="pdp-dot' +
+          (idx === 0 ? " is-active" : "") +
+          '" data-index="' +
+          idx +
+          '" aria-label="اسلاید ' +
+          (idx + 1) +
+          '"></button>'
+        );
+      })
+      .join("");
+
+    var colors = colorMeta
+      .map(function (c, idx) {
+        var imgHtml = c.image
+          ? '<span class="swatch-img"><img src="' +
+            c.image +
+            '" alt="" loading="lazy" /></span>'
+          : "";
+        return (
+          '<button type="button" class="js-color pdp-swatch' +
+          (idx === 0 ? " is-active" : "") +
+          '" data-color="' +
+          c.label +
+          '"' +
+          (c.image ? ' data-image="' + c.image + '"' : "") +
+          ">" +
+          imgHtml +
+          "<span>" +
+          c.label +
+          "</span></button>"
+        );
+      })
+      .join("");
+
+    var crumbCat = product.categoryName || product.category
+      ? '<a href="shop.html?cat=' +
+        encodeURIComponent(product.category || "") +
+        (product.categoryId
+          ? "&categoryId=" + encodeURIComponent(product.categoryId)
+          : "") +
+        '">' +
+        (product.categoryName || product.category) +
+        "</a>"
+      : "";
+
     $page.html(
-      '<div class="product-layout">' +
-        '<div class="product-gallery"><img src="' +
-        product.image +
-        '" alt="' +
+      '<div class="pdp" data-id="' +
+        product.id +
+        '">' +
+        '<div class="pdp-gallery" data-count="' +
+        images.length +
+        '">' +
+        '<div class="pdp-stage" tabindex="0" aria-roledescription="carousel">' +
+        (images.length > 1
+          ? '<button type="button" class="pdp-nav pdp-prev" aria-label="قبلی">‹</button>'
+          : "") +
+        '<div class="pdp-viewport"><div class="pdp-track">' +
+        slides +
+        "</div></div>" +
+        (images.length > 1
+          ? '<button type="button" class="pdp-nav pdp-next" aria-label="بعدی">›</button>'
+          : "") +
+        '<span class="pdp-counter"><b class="js-pdp-n">1</b> / ' +
+        images.length +
+        "</span>" +
+        "</div>" +
+        (images.length > 1
+          ? '<div class="pdp-dots" role="tablist">' + dots + "</div>"
+          : "") +
+        (images.length > 1
+          ? '<div class="pdp-thumbs" role="list">' + thumbs + "</div>"
+          : "") +
+        "</div>" +
+        '<div class="pdp-info">' +
+        '<nav class="pdp-breadcrumb" aria-label="مسیر">' +
+        '<a href="index.html">خانه</a>' +
+        (crumbCat ? "<span>/</span>" + crumbCat : "") +
+        "<span>/</span><span>" +
         product.name +
-        '" /></div>' +
-        '<div class="product-info">' +
+        "</span></nav>" +
         "<h1>" +
         product.name +
         "</h1>" +
@@ -450,18 +725,129 @@
         '<span class="price-now">' +
         formatPrice(price) +
         "</span></div>" +
-        "<p>رنگ‌بندی</p>" +
-        '<div class="color-swatches">' +
-        colors +
+        (colors
+          ? '<div class="pdp-field"><span class="pdp-label">رنگ</span><div class="color-swatches pdp-swatches">' +
+            colors +
+            "</div></div>"
+          : "") +
+        productAttrsHtml(product) +
+        '<div class="pdp-buy">' +
+        '<div class="pdp-qty" aria-label="تعداد">' +
+        '<button type="button" class="js-qty-dec" aria-label="کاهش">−</button>' +
+        '<input type="number" class="js-qty" value="1" min="1" max="99" inputmode="numeric" />' +
+        '<button type="button" class="js-qty-inc" aria-label="افزایش">+</button>' +
         "</div>" +
         '<button type="button" class="btn-red js-add-detail" data-id="' +
         product.id +
+        '">افزودن به سبد خرید</button>' +
+        "</div>" +
+        (product.desc
+          ? '<div class="pdp-desc"><h2>توضیحات</h2><p class="product-desc">' +
+            product.desc +
+            "</p></div>"
+          : "") +
+        "</div>" +
+        '<div class="pdp-sticky" hidden>' +
+        '<div class="pdp-sticky-inner">' +
+        '<div class="pdp-sticky-meta"><strong>' +
+        product.name +
+        '</strong><span class="price-now">' +
+        formatPrice(price) +
+        "</span></div>" +
+        '<button type="button" class="btn-red js-add-detail" data-id="' +
+        product.id +
         '">افزودن به سبد</button>' +
-        '<p class="product-desc">' +
-        (product.desc || "") +
-        "</p>" +
-        "</div></div>"
+        "</div></div>" +
+        "</div>"
     );
+
+    bindProductGallery($page, images);
+  }
+
+  function bindProductGallery($page, images) {
+    var index = 0;
+    var $track = $page.find(".pdp-track");
+    var $stage = $page.find(".pdp-stage");
+    var count = images.length;
+
+    function go(to) {
+      if (count < 1) return;
+      index = (to + count) % count;
+      $track.css("transform", "translate3d(-" + index * 100 + "%, 0, 0)");
+      $page.find(".pdp-slide").removeClass("is-active").eq(index).addClass("is-active");
+      $page.find(".pdp-thumb, .pdp-dot").removeClass("is-active");
+      $page.find('.pdp-thumb[data-index="' + index + '"], .pdp-dot[data-index="' + index + '"]').addClass("is-active");
+      $page.find(".js-pdp-n").text(String(index + 1));
+      var $activeThumb = $page.find(".pdp-thumb.is-active");
+      if ($activeThumb.length) {
+        var thumbs = $page.find(".pdp-thumbs")[0];
+        if (thumbs) {
+          $activeThumb[0].scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+        }
+      }
+    }
+
+    $page.find(".pdp-next").on("click", function () {
+      go(index + 1);
+    });
+    $page.find(".pdp-prev").on("click", function () {
+      go(index - 1);
+    });
+    $page.on("click", ".pdp-thumb, .pdp-dot", function () {
+      go(Number($(this).data("index")) || 0);
+    });
+
+    // Touch / swipe
+    var startX = 0;
+    var startY = 0;
+    var dragging = false;
+    $stage.on("touchstart", function (e) {
+      var t = e.originalEvent.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      dragging = true;
+    });
+    $stage.on("touchmove", function (e) {
+      if (!dragging) return;
+      var t = e.originalEvent.touches[0];
+      var dx = t.clientX - startX;
+      var dy = t.clientY - startY;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) {
+        e.preventDefault();
+      }
+    });
+    $stage.on("touchend", function (e) {
+      if (!dragging) return;
+      dragging = false;
+      var t = e.originalEvent.changedTouches[0];
+      var dx = t.clientX - startX;
+      if (Math.abs(dx) < 40) return;
+      // RTL: swipe right (positive dx) → previous visually left content... gallery still advances with dx sign
+      if (dx < 0) go(index + 1);
+      else go(index - 1);
+    });
+
+    // Color → jump to matching image if present
+    $page.on("click", ".js-color", function () {
+      var img = $(this).data("image");
+      if (!img) return;
+      var i = images.indexOf(img);
+      if (i >= 0) go(i);
+    });
+
+    // Sticky bar
+    var $sticky = $page.find(".pdp-sticky");
+    var $buy = $page.find(".pdp-buy");
+    function onScroll() {
+      if (!$buy.length) return;
+      var rect = $buy[0].getBoundingClientRect();
+      var show = rect.bottom < 0;
+      $sticky.prop("hidden", !show);
+    }
+    $(window).off("scroll.pdp").on("scroll.pdp", onScroll);
+    onScroll();
+
+    go(0);
   }
 
   function iconKey(icon) {
@@ -594,9 +980,14 @@
             if (match) {
               p.category = match.slug;
               p.categorySlug = match.slug;
+              p.categoryName = match.name;
             }
           });
           renderShop();
+          if ($("#productPage").length) {
+            var current = findProduct(queryParam("id"));
+            if (current) renderProductPage(current);
+          }
         }
       })
       .fail(function () {
@@ -663,13 +1054,34 @@
 
     $(document).on("click", ".js-add-detail", function () {
       var p = findProduct($(this).data("id"));
-      var color = $(".js-color.is-active").data("color") || "";
-      if (p) addToCart(p, color);
+      var color = $("#productPage .js-color.is-active").data("color") || "";
+      var qty = Number($("#productPage .js-qty").val()) || 1;
+      if (p) addToCart(p, color, qty);
     });
 
     $(document).on("click", ".js-color", function () {
-      $(".js-color").removeClass("is-active");
+      $(this).closest(".color-swatches, .pdp-swatches").find(".js-color").removeClass("is-active");
       $(this).addClass("is-active");
+    });
+
+    $(document).on("click", ".js-attr", function () {
+      $(this).closest(".pdp-attr-swatches, .pdp-swatches").find(".js-attr").removeClass("is-active");
+      $(this).addClass("is-active");
+    });
+
+    $(document).on("click", ".js-qty-dec", function () {
+      var $input = $("#productPage .js-qty");
+      var n = Math.max(1, (Number($input.val()) || 1) - 1);
+      $input.val(n);
+    });
+    $(document).on("click", ".js-qty-inc", function () {
+      var $input = $("#productPage .js-qty");
+      var n = Math.min(99, (Number($input.val()) || 1) + 1);
+      $input.val(n);
+    });
+    $(document).on("change", "#productPage .js-qty", function () {
+      var n = Math.max(1, Math.min(99, Number($(this).val()) || 1));
+      $(this).val(n);
     });
 
     $("#catFilter, #sortFilter").on("change", renderShop);
