@@ -20,28 +20,61 @@
     renderCart();
   }
 
-  function addToCart(product, color, qty) {
+  function addToCart(product, selection, qty) {
+    selection = selection || {};
     var amount = Math.max(1, Number(qty) || 1);
+    var attrs = selection.attrs || {};
+    var variantId = selection.variantId || "";
+    var variantLabel = selection.variantLabel || "";
+    var unitPrice = Number(selection.price);
+    if (!(unitPrice > 0)) {
+      unitPrice = product.salePrice || product.price || 0;
+    }
+    var image = selection.image || product.image || PLACEHOLDER_IMG;
+    var key =
+      product.id +
+      "::" +
+      (variantId ||
+        Object.keys(attrs)
+          .sort()
+          .map(function (k) {
+            return k + "=" + attrs[k];
+          })
+          .join("|"));
+
     var items = getCart();
-    var key = product.id + "::" + (color || "");
     var existing = items.find(function (i) {
       return i.key === key;
     });
     if (existing) {
       existing.qty += amount;
+      if (variantId) existing.variantId = variantId;
+      if (variantLabel) existing.variantLabel = variantLabel;
+      existing.price = unitPrice;
+      existing.attrs = attrs;
     } else {
       items.push({
         key: key,
         id: product.id,
+        productId: product.id,
+        variantId: variantId,
         name: product.name,
-        price: product.salePrice || product.price,
-        image: product.image,
-        color: color || "",
+        variantLabel: variantLabel,
+        attrs: attrs,
+        price: unitPrice,
+        image: image,
+        color: attrs.color || selection.color || "",
         qty: amount
       });
     }
     saveCart(items);
     openCart();
+  }
+
+  function cartLineTitle(item) {
+    if (item.variantLabel) return item.name + " — " + item.variantLabel;
+    if (item.color) return item.name + " — " + item.color;
+    return item.name;
   }
 
   function removeFromCart(key) {
@@ -97,7 +130,7 @@
     $items.html(
       items
         .map(function (item) {
-          var title = item.name + (item.color ? " — " + item.color : "");
+          var title = cartLineTitle(item);
           return (
             '<div class="cart-line" data-key="' +
             item.key +
@@ -501,13 +534,11 @@
     });
     if (!attrs.length) return "";
 
-    var selectable = "";
-    var specs = "";
-
-    attrs.forEach(function (a) {
-      var opts = Array.isArray(a.options) ? a.options : [];
-      var name = escapeHtml(a.name || "ویژگی");
-      if (opts.length > 1) {
+    return attrs
+      .map(function (a) {
+        var opts = Array.isArray(a.options) ? a.options : [];
+        if (!opts.length) return "";
+        var name = escapeHtml(a.name || "ویژگی");
         var chips = opts
           .map(function (o, idx) {
             return (
@@ -525,30 +556,221 @@
             );
           })
           .join("");
-        selectable +=
+        return (
           '<div class="pdp-field"><span class="pdp-label">' +
           name +
           '</span><div class="pdp-swatches pdp-attr-swatches">' +
           chips +
-          "</div></div>";
-      } else {
-        var val = opts[0] && opts[0].label ? opts[0].label : "—";
-        specs +=
-          "<div class=\"pdp-spec-row\"><span class=\"pdp-spec-name\">" +
-          name +
-          '</span><span class="pdp-spec-value">' +
-          escapeHtml(val) +
-          "</span></div>";
+          "</div></div>"
+        );
+      })
+      .join("");
+  }
+
+  function collectProductSelection(product) {
+    var $page = $("#productPage");
+    var selectedById = {};
+    var labels = [];
+
+    (product.attributes || []).forEach(function (a) {
+      if (isColorAttr(a)) {
+        var color = String($page.find(".js-color.is-active").data("color") || "").trim();
+        if (!color && a.options && a.options[0]) color = a.options[0].label;
+        if (color) {
+          selectedById[a.id] = color;
+          labels.push(color);
+        }
+        return;
+      }
+      var $active = $page.find('.js-attr.is-active[data-attr-id="' + a.id + '"]');
+      var val = String($active.data("value") || "").trim();
+      if (!val && a.options && a.options[0]) val = a.options[0].label;
+      if (val) {
+        selectedById[a.id] = val;
+        labels.push(val);
       }
     });
 
-    var specsBlock = specs
-      ? '<div class="pdp-features"><div class="pdp-label">ویژگی‌های محصول</div><div class="pdp-specs">' +
-        specs +
-        "</div></div>"
-      : "";
+    var variant = matchVariant(product, selectedById);
+    var resolve = window.ABERANG_MEDIA_URL || function (p) {
+      return p;
+    };
+    var price = product.price || 0;
+    var image = product.image;
+    if (variant) {
+      var sell = Number(variant.salePrice) || 0;
+      var cost = Number(variant.price) || 0;
+      price = sell > 0 ? sell : cost > 0 ? cost : price;
+      if (variant.image) image = resolve(variant.image);
+    }
 
-    return selectable + specsBlock;
+    return {
+      attrs: selectedById,
+      variantId: variant ? variant.id : "",
+      variantLabel: labels.join(" / "),
+      price: price,
+      image: image,
+      color: labels[0] || ""
+    };
+  }
+
+  function matchVariant(product, selectedById) {
+    var variants = product.variants || [];
+    if (!variants.length) return null;
+
+    var exact = variants.find(function (v) {
+      var av = v.attributeValues || {};
+      var keys = Object.keys(av);
+      if (!keys.length) return Object.keys(selectedById).length === 0;
+      return keys.every(function (k) {
+        return String(av[k] || "") === String(selectedById[k] || "");
+      });
+    });
+    if (exact) return exact;
+
+    // Soft match: all selected values appear in the variant map
+    var selectedVals = Object.keys(selectedById).map(function (k) {
+      return String(selectedById[k]);
+    });
+    return (
+      variants.find(function (v) {
+        var vals = Object.keys(v.attributeValues || {}).map(function (k) {
+          return String(v.attributeValues[k]);
+        });
+        return selectedVals.every(function (s) {
+          return vals.indexOf(s) !== -1;
+        });
+      }) || null
+    );
+  }
+
+  function ensureCheckoutModal() {
+    if ($("#checkoutModal").length) return;
+    $("body").append(
+      '<div class="checkout-modal" id="checkoutModal" hidden>' +
+        '<div class="checkout-panel" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">' +
+        '<div class="checkout-head">' +
+        '<h2 id="checkoutTitle">ثبت سفارش</h2>' +
+        '<button type="button" class="checkout-close" id="checkoutClose" aria-label="بستن">×</button>' +
+        "</div>" +
+        '<p class="checkout-hint">مشخصات انتخاب‌شده همراه سفارش ثبت می‌شود.</p>' +
+        '<div class="checkout-summary" id="checkoutSummary"></div>' +
+        '<form id="checkoutForm" class="checkout-form">' +
+        '<label>نام و نام خانوادگی<input name="name" required autocomplete="name" /></label>' +
+        '<label>شماره موبایل<input name="phone" type="tel" required autocomplete="tel" inputmode="tel" placeholder="09xxxxxxxxx" /></label>' +
+        '<label>آدرس<textarea name="address" rows="3" required autocomplete="street-address"></textarea></label>' +
+        '<label>توضیحات (اختیاری)<textarea name="notes" rows="2"></textarea></label>' +
+        '<p class="checkout-error" id="checkoutError" hidden></p>' +
+        '<button type="submit" class="btn-red checkout-submit" id="checkoutSubmit">ثبت و صدور فاکتور</button>' +
+        "</form>" +
+        "</div></div>"
+    );
+  }
+
+  function openCheckout() {
+    var items = getCart();
+    if (!items.length) {
+      alert("سبد خرید خالی است.");
+      return;
+    }
+    var missing = items.filter(function (i) {
+      return !i.variantId;
+    });
+    if (missing.length) {
+      alert(
+        "برای بعضی اقلام ترکیب ویژگی یافت نشد. لطفاً از صفحه محصول رنگ و ویژگی‌ها را دوباره انتخاب کنید."
+      );
+      return;
+    }
+    ensureCheckoutModal();
+    $("#checkoutSummary").html(
+      items
+        .map(function (i) {
+          return (
+            "<div class=\"checkout-sum-line\"><strong>" +
+            escapeHtml(cartLineTitle(i)) +
+            "</strong><span>× " +
+            i.qty.toLocaleString("fa-IR") +
+            " — " +
+            formatPrice(i.price * i.qty) +
+            "</span></div>"
+          );
+        })
+        .join("") +
+        '<div class="checkout-sum-total"><span>جمع</span><strong>' +
+        formatPrice(cartTotal()) +
+        "</strong></div>"
+    );
+    $("#checkoutError").prop("hidden", true).text("");
+    $("#checkoutModal").prop("hidden", false);
+    closeCart();
+    $("#overlay").prop("hidden", false);
+  }
+
+  function closeCheckout() {
+    $("#checkoutModal").prop("hidden", true);
+    if (!$("#cartDrawer").hasClass("is-open") && !$("#menuDrawer").hasClass("is-open")) {
+      $("#overlay").prop("hidden", true);
+    }
+  }
+
+  function submitCheckout(e) {
+    e.preventDefault();
+    var $form = $("#checkoutForm");
+    var name = String($form.find('[name="name"]').val() || "").trim();
+    var phone = String($form.find('[name="phone"]').val() || "").trim();
+    var address = String($form.find('[name="address"]').val() || "").trim();
+    var notes = String($form.find('[name="notes"]').val() || "").trim();
+    var $err = $("#checkoutError");
+    var $btn = $("#checkoutSubmit");
+
+    if (!name || !phone || !address) {
+      $err.text("نام، موبایل و آدرس الزامی است.").prop("hidden", false);
+      return;
+    }
+
+    var payload = {
+      customer: { name: name, phone: phone, address: address },
+      notes: notes,
+      items: getCart().map(function (i) {
+        return {
+          productId: i.productId || i.id,
+          variantId: i.variantId,
+          quantity: i.qty
+        };
+      })
+    };
+
+    var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
+    $btn.prop("disabled", true).text("در حال ثبت...");
+    $err.prop("hidden", true);
+
+    $.ajax({
+      url: base + "/checkout",
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify(payload),
+      dataType: "json"
+    })
+      .done(function (inv) {
+        saveCart([]);
+        closeCheckout();
+        alert(
+          "سفارش ثبت شد.\nشماره فاکتور: " +
+            (inv && inv.number ? inv.number : "") +
+            "\nدر داشبورد → فاکتورها قابل مشاهده است."
+        );
+      })
+      .fail(function (xhr) {
+        var msg = "ثبت سفارش ناموفق بود.";
+        try {
+          msg = (xhr.responseJSON && xhr.responseJSON.error) || msg;
+        } catch (err) {}
+        $err.text(msg).prop("hidden", false);
+      })
+      .always(function () {
+        $btn.prop("disabled", false).text("ثبت و صدور فاکتور");
+      });
   }
 
   function colorOptionMeta(product) {
@@ -1020,11 +1242,13 @@
     $("#overlay").on("click", function () {
       closeCart();
       closeMenu();
+      closeCheckout();
     });
     $(document).on("keydown", function (e) {
       if (e.key === "Escape") {
         closeCart();
         closeMenu();
+        closeCheckout();
       }
     });
 
@@ -1043,20 +1267,52 @@
     });
 
     $("#cartContinue").on("click", closeCart);
-    $("#cartCheckout").on("click", function () {
-      alert("ثبت سفارش به‌زودی فعال می‌شود.");
-    });
+    $("#cartCheckout").on("click", openCheckout);
+    $(document).on("click", "#checkoutClose", closeCheckout);
+    $(document).on("submit", "#checkoutForm", submitCheckout);
 
     $(document).on("click", ".js-add", function () {
       var p = findProduct($(this).data("id"));
-      if (p) addToCart(p, (p.colors && p.colors[0]) || "");
+      if (!p) return;
+      var color = (p.colors && p.colors[0]) || "";
+      var attrs = {};
+      (p.attributes || []).forEach(function (a) {
+        if (a.options && a.options[0]) attrs[a.id] = a.options[0].label;
+      });
+      var sel = {
+        attrs: attrs,
+        variantId: "",
+        variantLabel: color,
+        price: p.salePrice || p.price,
+        image: p.image,
+        color: color
+      };
+      var matched = matchVariant(p, attrs);
+      if (matched) {
+        sel.variantId = matched.id;
+        var sell = Number(matched.salePrice) || 0;
+        var cost = Number(matched.price) || 0;
+        sel.price = sell > 0 ? sell : cost > 0 ? cost : sel.price;
+        var parts = (p.attributes || [])
+          .map(function (a) {
+            return attrs[a.id];
+          })
+          .filter(Boolean);
+        sel.variantLabel = parts.join(" / ");
+      }
+      addToCart(p, sel, 1);
     });
 
     $(document).on("click", ".js-add-detail", function () {
       var p = findProduct($(this).data("id"));
-      var color = $("#productPage .js-color.is-active").data("color") || "";
+      if (!p) return;
       var qty = Number($("#productPage .js-qty").val()) || 1;
-      if (p) addToCart(p, color, qty);
+      var sel = collectProductSelection(p);
+      if (!sel.variantId && (p.variants || []).length) {
+        alert("این ترکیب ویژگی در موجودی نیست. لطفاً رنگ و ویژگی‌های دیگر را تغییر دهید.");
+        return;
+      }
+      addToCart(p, sel, qty);
     });
 
     $(document).on("click", ".js-color", function () {

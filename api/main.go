@@ -302,6 +302,21 @@ func main() {
 		c.JSON(http.StatusOK, p)
 	})
 
+	// Public storefront checkout → confirmed invoice (order)
+	api.POST("/checkout", func(c *gin.Context) {
+		var body repo.CheckoutRequest
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		inv, err := repo.CreateStorefrontOrder(database, body)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, inv)
+	})
+
 	// Products (write ops auth)
 	authed.POST("/products", func(c *gin.Context) {
 		var p models.Product

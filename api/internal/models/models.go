@@ -77,6 +77,7 @@ type Invoice struct {
 	Subtotal        int64         `json:"subtotal"`
 	Total           int64         `json:"total"`
 	Status          string        `json:"status"` // draft|confirmed
+	Source          string        `json:"source"` // dashboard|storefront
 	CreatedAt       string        `json:"createdAt"`
 }
 

@@ -22,6 +22,7 @@ type invoiceRow struct {
 	Subtotal        int64  `db:"subtotal"`
 	Total           int64  `db:"total"`
 	Status          string `db:"status"`
+	Source          string `db:"source"`
 	CreatedAt       string `db:"created_at"`
 	UpdatedAt       string `db:"updated_at"`
 }
@@ -95,8 +96,16 @@ func GetInvoice(db *sqlx.DB, id string) (*models.Invoice, error) {
 		Subtotal:        r.Subtotal,
 		Total:           r.Total,
 		Status:          r.Status,
+		Source:          coalesceSource(r.Source),
 		CreatedAt:       r.CreatedAt,
 	}, nil
+}
+
+func coalesceSource(s string) string {
+	if s == "" {
+		return "dashboard"
+	}
+	return s
 }
 
 func NextInvoiceNumber(db *sqlx.DB) (string, error) {
@@ -154,11 +163,16 @@ func UpsertInvoice(db *sqlx.DB, inv models.Invoice) error {
 			createdAt = time.Now().Format(time.RFC3339)
 		}
 
+		source := inv.Source
+		if source == "" {
+			source = "dashboard"
+		}
+
 		_, err = tx.Exec(
 			`INSERT INTO invoices(
 				id, number, date, customer_id, customer_name, customer_phone, customer_address,
-				notes, discount, subtotal, total, status, created_at
-			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+				notes, discount, subtotal, total, status, source, created_at
+			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 			ON DUPLICATE KEY UPDATE
 				number=VALUES(number),
 				date=VALUES(date),
@@ -171,9 +185,10 @@ func UpsertInvoice(db *sqlx.DB, inv models.Invoice) error {
 				subtotal=VALUES(subtotal),
 				total=VALUES(total),
 				status=VALUES(status),
+				source=VALUES(source),
 				created_at=VALUES(created_at)`,
 			inv.ID, inv.Number, inv.Date, inv.CustomerID, inv.CustomerName, inv.CustomerPhone, inv.CustomerAddress,
-			inv.Notes, inv.Discount, inv.Subtotal, inv.Total, inv.Status, createdAt,
+			inv.Notes, inv.Discount, inv.Subtotal, inv.Total, inv.Status, source, createdAt,
 		)
 		if err != nil {
 			return err

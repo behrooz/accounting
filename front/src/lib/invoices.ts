@@ -55,6 +55,8 @@ export type Invoice = {
   /** subtotal - discount */
   total: number;
   status: "draft" | "confirmed";
+  /** dashboard = created in panel; storefront = online shop order */
+  source?: "dashboard" | "storefront" | string;
   createdAt: string;
 };
 

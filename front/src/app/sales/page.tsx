@@ -48,6 +48,13 @@ const StatusBadge = ({ value }: { value: string }) =>
     <span className="rounded bg-[#f2f3f3] px-2 py-0.5 text-xs font-medium text-[#545b64]">پیش‌نویس</span>
   );
 
+const SourceBadge = ({ value }: { value?: string }) =>
+  value === "storefront" ? (
+    <span className="rounded bg-[#e7f2f8] px-2 py-0.5 text-xs font-medium text-[#0073bb]">سفارش فروشگاه</span>
+  ) : (
+    <span className="rounded bg-[#f2f3f3] px-2 py-0.5 text-xs font-medium text-[#545b64]">داشبورد</span>
+  );
+
 const ActionCellRenderer = ({ data, context }: ICellRendererParams) => {
   const ctx = context as GridCtx;
   const inv = data as Invoice;
@@ -76,6 +83,8 @@ const COLUMN_DEFS: ColDef<Invoice>[] = [
   { field: "number", headerName: "شماره فاکتور", editable: false, width: 140, filter: "agTextColumnFilter" },
   { field: "date", headerName: "تاریخ", editable: false, width: 120, valueFormatter: (p) => faDate(p.value as string) },
   { field: "customerName", headerName: "مشتری", editable: false, flex: 1, minWidth: 140, filter: "agTextColumnFilter", valueFormatter: (p) => (p.value as string) || "—" },
+  { field: "customerPhone", headerName: "تلفن", editable: false, width: 120, filter: "agTextColumnFilter", valueFormatter: (p) => (p.value as string) || "—" },
+  { field: "source", headerName: "منبع", editable: false, width: 130, cellRenderer: (p: ICellRendererParams) => <SourceBadge value={p.value as string} /> },
   { headerName: "اقلام", editable: false, width: 80, sortable: true, valueGetter: (p) => p.data?.items.length ?? 0 },
   { field: "subtotal", headerName: "جمع اقلام", editable: false, width: 140, sortable: true, valueFormatter: (p) => fa(p.value as number) + " تومان" },
   { field: "total", headerName: "قابل پرداخت", editable: false, width: 150, sortable: true, valueFormatter: (p) => fa(p.value as number) + " تومان" },
