@@ -24,8 +24,9 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
+# App runs as uid 10001 (appuser); host path must be writable by that user
+podSecurityContext:
+  fsGroup: 10001
 
 securityContext: {}
   # capabilities:
@@ -152,7 +153,15 @@ readinessProbe:
   timeoutSeconds: 3
   failureThreshold: 3
 
-# Additional volumes
+# Persist uploaded product images on the node
+# Host: /opt/bugx/api  →  Container: /app/assets
+persistence:
+  enabled: true
+  hostPath: /opt/bugx/api
+  mountPath: /app/assets
+  type: DirectoryOrCreate
+
+# Additional volumes (appended after persistence volume when enabled)
 volumes: []
 
 volumeMounts: []
