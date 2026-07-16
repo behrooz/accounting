@@ -260,8 +260,11 @@ export default function InvoiceEditor({
     router.push("/sales");
   };
 
+  const currentStatus: Invoice["status"] =
+    initialInvoice?.status === "confirmed" ? "confirmed" : "draft";
+
   const handlePrint = async () => {
-    await saveInvoice(buildInvoice(status));
+    await saveInvoice(buildInvoice(currentStatus));
     router.push(`/sales/${invoiceId.current}/print?mode=invoice`);
   };
 
@@ -270,7 +273,7 @@ export default function InvoiceEditor({
       alert("اطلاعات مشتری / آدرس سفارش برای برچسب بسته ناقص است.");
       return;
     }
-    await saveInvoice(buildInvoice(status));
+    await saveInvoice(buildInvoice(currentStatus));
     router.push(`/sales/${invoiceId.current}/print?mode=label`);
   };
 
