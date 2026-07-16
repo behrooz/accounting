@@ -34,7 +34,6 @@ jobs:
           # Registry only accepts Docker schema2 (not OCI) manifests
           tags: |
             188.132.232.168:30836/accounting-web:${{ github.run_number }}
-            188.132.232.168:30836/accounting-web:latest
           outputs: type=image,push=true,oci-mediatypes=false
           cache-from: type=gha
           cache-to: type=gha,mode=max
