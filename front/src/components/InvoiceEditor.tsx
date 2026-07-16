@@ -12,9 +12,7 @@ import {
   type Invoice,
   type InvoiceItem,
 } from "@/lib/invoices";
-import { gregorianISOToJalali } from "@/lib/jalali";
 import ShamsiDatePicker from "@/components/ShamsiDatePicker";
-import { getShopSettings, type ShopSettings } from "@/lib/shop";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Local item state (same shape as InvoiceItem)
@@ -44,10 +42,6 @@ function todayIso() {
   return `${y}-${m}-${d}`;
 }
 
-function faDate(iso: string) {
-  return gregorianISOToJalali(iso, "YYYY/MM/DD");
-}
-
 const fa = (n: number) => Math.round(n).toLocaleString("fa-IR");
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -57,8 +51,6 @@ const fa = (n: number) => Math.round(n).toLocaleString("fa-IR");
 type Props = {
   initialInvoice?: Invoice;
   isNew?: boolean;
-  /** When opening via ?label=1 or ?print=1 */
-  initialPrintMode?: "invoice" | "label" | null;
 };
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -68,7 +60,6 @@ type Props = {
 export default function InvoiceEditor({
   initialInvoice,
   isNew = true,
-  initialPrintMode = null,
 }: Props) {
   const router = useRouter();
   const invoiceId = useRef(initialInvoice?.id ?? crypto.randomUUID());
@@ -76,14 +67,6 @@ export default function InvoiceEditor({
   /* ── Data from localStorage ─────────────────────────────────────────── */
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [shop, setShop] = useState<ShopSettings>({
-    name: "",
-    phone: "",
-    address: "",
-  });
-  const [printMode, setPrintMode] = useState<"invoice" | "label">(
-    initialPrintMode === "label" ? "label" : "invoice",
-  );
 
   // Product picker state
   const [activeProductPicker, setActiveProductPicker] = useState<string | null>(
@@ -119,18 +102,10 @@ export default function InvoiceEditor({
     const load = async () => {
       setProducts(await getProducts());
       setCustomers(await getCustomers());
-      setShop(await getShopSettings());
       if (isNew) setInvNumber(await nextInvoiceNumber());
     };
     void load();
   }, [isNew]);
-
-  useEffect(() => {
-    if (!initialPrintMode) return;
-    setPrintMode(initialPrintMode === "label" ? "label" : "invoice");
-    const t = setTimeout(() => window.print(), 450);
-    return () => clearTimeout(t);
-  }, [initialPrintMode]);
 
   /* ── Customer select → auto-fill fields ─────────────────────────────── */
   const handleCustomerSelect = (id: string) => {
@@ -285,22 +260,18 @@ export default function InvoiceEditor({
     router.push("/sales");
   };
 
-  const handlePrint = () => {
-    setPrintMode("invoice");
-    setTimeout(() => window.print(), 50);
+  const handlePrint = async () => {
+    await saveInvoice(buildInvoice(status));
+    router.push(`/sales/${invoiceId.current}/print?mode=invoice`);
   };
 
-  const handlePrintLabel = () => {
+  const handlePrintLabel = async () => {
     if (!customerName.trim() && !customerPhone.trim() && !customerAddress.trim()) {
-      alert("اطلاعات مشتری (گیرنده) برای برچسب بسته ناقص است.");
+      alert("اطلاعات مشتری / آدرس سفارش برای برچسب بسته ناقص است.");
       return;
     }
-    if (!shop.name.trim()) {
-      alert("اطلاعات فروشگاه را از منوی «اطلاعات فروشگاه» تکمیل کنید.");
-      return;
-    }
-    setPrintMode("label");
-    setTimeout(() => window.print(), 50);
+    await saveInvoice(buildInvoice(status));
+    router.push(`/sales/${invoiceId.current}/print?mode=label`);
   };
 
   /* ── Input class helper ──────────────────────────────────────────────── */
@@ -337,13 +308,13 @@ export default function InvoiceEditor({
             {!isNew && (
               <>
                 <button
-                  onClick={handlePrint}
+                  onClick={() => void handlePrint()}
                   className="rounded border border-[#0073bb] bg-white px-4 py-2 text-sm font-medium text-[#0073bb] hover:bg-[#e7f2f8] transition"
                 >
                   چاپ فاکتور
                 </button>
                 <button
-                  onClick={handlePrintLabel}
+                  onClick={() => void handlePrintLabel()}
                   className="rounded border border-[#1d8102] bg-white px-4 py-2 text-sm font-medium text-[#1d8102] hover:bg-[#ebf6e8] transition"
                 >
                   برچسب بسته
@@ -777,213 +748,9 @@ export default function InvoiceEditor({
         {/* Print hint when in edit mode */}
         {isNew && (
           <p className="text-xs text-[#879596]">
-            پس از ذخیره، دکمه «چاپ فاکتور» در همین صفحه فعال می‌شود.
+            پس از ذخیره، دکمه‌های «چاپ فاکتور» و «برچسب بسته» فعال می‌شوند.
           </p>
         )}
-      </div>
-
-      {/* ══════════════════════════════════════════════════════════════════
-          PRINT VIEW — invoice
-      ══════════════════════════════════════════════════════════════════ */}
-      <div
-        className={`${
-          printMode === "invoice" ? "hidden print:block" : "hidden"
-        } bg-white text-[#16191f]`}
-      >
-        <div className="mx-auto max-w-[780px] p-10">
-          {/* Header */}
-          <div className="mb-8 flex items-start justify-between border-b-2 border-[#16191f] pb-5">
-            <div>
-              <h1 className="text-2xl font-bold">سیستم حسابداری</h1>
-              <p className="mt-1 text-sm text-[#545b64]">فاکتور فروش</p>
-            </div>
-            <div className="text-left">
-              <p className="text-2xl font-bold text-[#0073bb]">{invNumber}</p>
-              <p className="mt-1 text-sm text-[#545b64]">
-                تاریخ: {faDate(date)}
-              </p>
-            </div>
-          </div>
-
-          {/* Customer info */}
-          {customerName && (
-            <div className="mb-6 rounded border border-[#d5dbdb] p-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#545b64]">
-                مشتری
-              </p>
-              <p className="font-bold text-[#16191f]">{customerName}</p>
-              {customerPhone && (
-                <p className="mt-0.5 text-sm text-[#545b64]">
-                  تلفن: {customerPhone}
-                </p>
-              )}
-              {customerAddress && (
-                <p className="mt-0.5 text-sm text-[#545b64]">
-                  آدرس: {customerAddress}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Items */}
-          <table className="mb-6 w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b-2 border-[#16191f] text-right">
-                <th className="py-2 pl-4 text-xs font-semibold text-[#545b64]">
-                  #
-                </th>
-                <th className="py-2 pl-4 text-xs font-semibold text-[#545b64]">
-                  شرح کالا
-                </th>
-                <th className="py-2 pl-4 text-xs font-semibold text-[#545b64]">
-                  کد
-                </th>
-                <th className="py-2 pl-4 text-right text-xs font-semibold text-[#545b64]">
-                  قیمت واحد
-                </th>
-                <th className="py-2 pl-4 text-right text-xs font-semibold text-[#545b64]">
-                  تعداد
-                </th>
-                <th className="py-2 text-right text-xs font-semibold text-[#545b64]">
-                  جمع
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, i) => (
-                <tr key={item.id} className="border-b border-[#d5dbdb]">
-                  <td className="py-2.5 pl-4 text-[#545b64]">{i + 1}</td>
-                  <td className="py-2.5 pl-4">
-                    <p className="font-medium">{item.productName}</p>
-                    {item.variantLabel && item.variantLabel !== "ساده" && (
-                      <p className="text-xs text-[#545b64]">
-                        {item.variantLabel}
-                      </p>
-                    )}
-                  </td>
-                  <td className="py-2.5 pl-4 font-mono text-xs text-[#545b64]">
-                    {item.sku || "—"}
-                  </td>
-                  <td className="py-2.5 pl-4 tabular-nums text-left">
-                    {fa(item.unitPrice)}
-                  </td>
-                  <td className="py-2.5 pl-4 text-left">{item.quantity}</td>
-                  <td className="py-2.5 tabular-nums font-semibold text-left">
-                    {fa(item.total)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Totals */}
-          <div className="flex justify-end">
-            <div className="w-72 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-[#545b64]">جمع کل:</span>
-                <span className="tabular-nums">{fa(subtotal)} تومان</span>
-              </div>
-              {discount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-[#545b64]">تخفیف:</span>
-                  <span className="tabular-nums text-[#d13212]">
-                    ({fa(discount)}) تومان
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between border-t-2 border-[#16191f] pt-2 font-bold">
-                <span>مبلغ قابل پرداخت:</span>
-                <span className="tabular-nums text-[#0073bb]">
-                  {fa(total)} تومان
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Notes */}
-          {notes && (
-            <div className="mt-8 rounded border border-[#d5dbdb] p-4">
-              <p className="mb-1 text-xs font-semibold text-[#545b64]">
-                توضیحات
-              </p>
-              <p className="text-sm">{notes}</p>
-            </div>
-          )}
-
-          {/* Signature line */}
-          <div className="mt-16 grid grid-cols-3 gap-8 text-center text-xs text-[#545b64]">
-            <div>
-              <div className="mb-6 border-b border-[#d5dbdb]" />
-              امضا فروشنده
-            </div>
-            <div />
-            <div>
-              <div className="mb-6 border-b border-[#d5dbdb]" />
-              امضا خریدار
-            </div>
-          </div>
-
-          {/* Footer */}
-          <p className="mt-8 text-center text-[10px] text-[#879596]">
-            این فاکتور توسط سیستم حسابداری صادر شده است.
-          </p>
-        </div>
-      </div>
-
-      {/* ══════════════════════════════════════════════════════════════════
-          PRINT VIEW — shipping / package label
-      ══════════════════════════════════════════════════════════════════ */}
-      <div
-        className={`${
-          printMode === "label" ? "hidden print:block" : "hidden"
-        } bg-white text-[#16191f]`}
-      >
-        <div className="mx-auto max-w-[420px] p-6">
-          <div className="overflow-hidden rounded-lg border-2 border-[#16191f]">
-            <div className="border-b-2 border-[#16191f] bg-[#f2f3f3] px-4 py-2 text-center text-sm font-bold">
-              برچسب بسته پستی
-              {invNumber ? (
-                <span className="mr-2 font-normal text-[#545b64]">
-                  ({invNumber})
-                </span>
-              ) : null}
-            </div>
-
-            <div className="border-b-2 border-dashed border-[#aab7b8] p-4">
-              <p className="mb-2 text-xs font-bold text-[#0073bb]">فرستنده</p>
-              <p className="text-base font-bold">{shop.name || "—"}</p>
-              {shop.phone ? (
-                <p className="mt-1 text-sm tabular-nums" dir="ltr">
-                  {shop.phone}
-                </p>
-              ) : null}
-              {shop.address ? (
-                <p className="mt-2 text-sm leading-6 text-[#16191f]">
-                  {shop.address}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="p-4">
-              <p className="mb-2 text-xs font-bold text-[#1d8102]">گیرنده</p>
-              <p className="text-lg font-bold">
-                {customerName || "—"}
-              </p>
-              {customerPhone ? (
-                <p className="mt-1 text-sm tabular-nums" dir="ltr">
-                  {customerPhone}
-                </p>
-              ) : null}
-              {customerAddress ? (
-                <p className="mt-2 text-sm leading-6 text-[#16191f]">
-                  {customerAddress}
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-[#879596]">آدرس ثبت نشده</p>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
     </>
   );

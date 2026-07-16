@@ -1,25 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { getInvoiceById, type Invoice } from "@/lib/invoices";
 import InvoiceEditor from "@/components/InvoiceEditor";
 
 export default function InvoiceDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const id = params?.id as string;
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [notFound, setNotFound] = useState(false);
-
-  const printMode =
-    searchParams?.get("label") === "1"
-      ? "label"
-      : searchParams?.get("print") === "1"
-        ? "invoice"
-        : null;
 
   useEffect(() => {
     const load = async () => {
@@ -55,11 +47,5 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  return (
-    <InvoiceEditor
-      initialInvoice={invoice}
-      isNew={false}
-      initialPrintMode={printMode}
-    />
-  );
+  return <InvoiceEditor initialInvoice={invoice} isNew={false} />;
 }

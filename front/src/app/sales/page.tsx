@@ -171,9 +171,15 @@ export default function SalesPage() {
 
   const handleEdit = useCallback((id: string) => router.push(`/sales/${id}`), [router]);
 
-  const handlePrint = useCallback((id: string) => router.push(`/sales/${id}?print=1`), [router]);
+  const handlePrint = useCallback(
+    (id: string) => router.push(`/sales/${id}/print?mode=invoice`),
+    [router],
+  );
 
-  const handleLabel = useCallback((id: string) => router.push(`/sales/${id}?label=1`), [router]);
+  const handleLabel = useCallback(
+    (id: string) => router.push(`/sales/${id}/print?mode=label`),
+    [router],
+  );
 
   const handleDelete = useCallback(async (id: string) => {
     if (!window.confirm("آیا از حذف این فاکتور مطمئن هستید؟")) return;

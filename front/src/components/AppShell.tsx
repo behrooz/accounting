@@ -11,6 +11,10 @@ type Props = {
 
 const PUBLIC_ROUTE_PREFIXES = ["/login", "/shop"];
 
+function isPrintRoute(pathname: string) {
+  return /\/sales\/[^/]+\/print\/?$/.test(pathname);
+}
+
 export default function AppShell({ children }: Props) {
   const pathname = usePathname();
   const router = useRouter();
@@ -39,6 +43,7 @@ export default function AppShell({ children }: Props) {
 
   const p = pathname ?? "/";
   const isPublic = PUBLIC_ROUTE_PREFIXES.some((prefix) => p.startsWith(prefix));
+  const isPrint = isPrintRoute(p);
 
   if (!ready) {
     return (
@@ -48,7 +53,7 @@ export default function AppShell({ children }: Props) {
     );
   }
 
-  if (isPublic) {
+  if (isPublic || isPrint) {
     return (
       <main className="flex min-h-screen flex-1 flex-col overflow-auto">
         {children}
