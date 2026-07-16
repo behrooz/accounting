@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AgGridReact } from "ag-grid-react";
+import DatePicker from "react-multi-date-picker";
+import persian from "react-date-object/calendars/persian";
+import persian_fa from "react-date-object/locales/persian_fa";
 import {
   AllCommunityModule,
   ModuleRegistry,
@@ -12,6 +15,7 @@ import {
   themeQuartz,
 } from "ag-grid-community";
 import { deleteInvoice, getInvoices, type Invoice } from "@/lib/invoices";
+import { gregorianISOToJalali, jalaliToGregorianISO, isoToLocalDate } from "@/lib/jalali";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -77,7 +81,7 @@ const ActionCellRenderer = ({ data, context }: ICellRendererParams) => {
 };
 
 const fa = (n: number) => Math.round(n).toLocaleString("fa-IR");
-const faDate = (d: string) => { try { return new Date(d).toLocaleDateString("fa-IR"); } catch { return d; } };
+const faDate = (d: string) => gregorianISOToJalali(d, "YYYY/MM/DD");
 
 const COLUMN_DEFS: ColDef<Invoice>[] = [
   { field: "number", headerName: "شماره فاکتور", editable: false, width: 140, filter: "agTextColumnFilter" },
@@ -215,20 +219,30 @@ export default function SalesPage() {
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex min-w-[140px] flex-col gap-1 text-xs font-medium text-[#545b64]">
             از تاریخ
-            <input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) => updateFilter("dateFrom", e.target.value)}
-              className={inputCls}
+            <DatePicker
+              calendar={persian}
+              locale={persian_fa}
+              format="YYYY/MM/DD"
+              value={filters.dateFrom ? isoToLocalDate(filters.dateFrom) : undefined}
+              onChange={(d) => {
+                if (!d) return updateFilter("dateFrom", "");
+                updateFilter("dateFrom", jalaliToGregorianISO(d));
+              }}
+              inputClass={inputCls}
             />
           </label>
           <label className="flex min-w-[140px] flex-col gap-1 text-xs font-medium text-[#545b64]">
             تا تاریخ
-            <input
-              type="date"
-              value={filters.dateTo}
-              onChange={(e) => updateFilter("dateTo", e.target.value)}
-              className={inputCls}
+            <DatePicker
+              calendar={persian}
+              locale={persian_fa}
+              format="YYYY/MM/DD"
+              value={filters.dateTo ? isoToLocalDate(filters.dateTo) : undefined}
+              onChange={(d) => {
+                if (!d) return updateFilter("dateTo", "");
+                updateFilter("dateTo", jalaliToGregorianISO(d));
+              }}
+              inputClass={inputCls}
             />
           </label>
           <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-xs font-medium text-[#545b64]">

@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import DatePicker from "react-multi-date-picker";
+import persian from "react-date-object/calendars/persian";
+import persian_fa from "react-date-object/locales/persian_fa";
 import { getProducts, type Product } from "@/lib/products";
 import { getCustomers, type Customer } from "@/lib/customers";
 import {
@@ -12,6 +15,7 @@ import {
   type Invoice,
   type InvoiceItem,
 } from "@/lib/invoices";
+import { gregorianISOToJalali, jalaliToGregorianISO, isoToLocalDate } from "@/lib/jalali";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Local item state (same shape as InvoiceItem)
@@ -38,15 +42,8 @@ function todayIso() {
 }
 
 function faDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString("fa-IR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  } catch {
-    return iso;
-  }
+  // Show Jalali (Shamsi) date using Persian digits
+  return gregorianISOToJalali(iso, "YYYY/MM/DD");
 }
 
 const fa = (n: number) => Math.round(n).toLocaleString("fa-IR");
@@ -344,11 +341,16 @@ export default function InvoiceEditor({ initialInvoice, isNew = true }: Props) {
                 <span className="text-xs font-medium text-[#545b64]">
                   تاریخ
                 </span>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className={inp}
+                <DatePicker
+                  calendar={persian}
+                  locale={persian_fa}
+                  format="YYYY/MM/DD"
+                  value={date ? isoToLocalDate(date) : undefined}
+                  onChange={(d) => {
+                    if (!d) return setDate("");
+                    setDate(jalaliToGregorianISO(d));
+                  }}
+                  inputClass={inp}
                 />
               </label>
               <label className="flex flex-col gap-1.5 sm:col-span-2">

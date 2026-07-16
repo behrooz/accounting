@@ -15,6 +15,7 @@ import {
   themeQuartz,
 } from "ag-grid-community";
 import {
+  cloneProductForCreate,
   deleteProduct,
   getProducts,
   saveProducts,
@@ -210,21 +211,13 @@ export default function ProductsGrid() {
 
   const handleDuplicate = useCallback(
     (product: Product) => {
-      const copy: Product = {
-        ...product,
-        id: crypto.randomUUID(),
-        name: `${product.name} (کپی)`,
-        variants: product.variants.map((v) => ({
-          ...v,
-          id: crypto.randomUUID(),
-        })),
-      };
-      const idx = dataRef.current.findIndex((p) => p.id === product.id);
-      const next = [...dataRef.current];
-      next.splice(idx + 1, 0, copy);
-      commit(next);
+      const copy = cloneProductForCreate(product);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("accounting-product-copy", JSON.stringify(copy));
+      }
+      router.push("/products/manage/new?copy=1");
     },
-    [commit],
+    [router],
   );
 
   const onCellValueChanged = useCallback(

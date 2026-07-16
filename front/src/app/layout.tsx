@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Vazirmatn } from "next/font/google";
 import "./globals.css";
+import "react-multi-date-picker/styles/layouts/prime.css";
+import "react-multi-date-picker/styles/colors/teal.css";
 import AppShell from "@/components/AppShell";
 
 /**

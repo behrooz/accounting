@@ -67,6 +67,26 @@ export type Product = {
   variants: ProductVariant[];
 };
 
+export const cloneProductForCreate = (product: Product): Product => ({
+  ...product,
+  id: crypto.randomUUID(),
+  name: `${product.name} (کپی)`,
+  images: [...(product.images ?? [])],
+  attributes: product.attributes.map((attr) => ({
+    ...attr,
+    id: crypto.randomUUID(),
+    options: attr.options.map((opt) => ({
+      ...opt,
+      id: crypto.randomUUID(),
+    })),
+  })),
+  variants: product.variants.map((variant) => ({
+    ...variant,
+    id: crypto.randomUUID(),
+    attributeValues: { ...variant.attributeValues },
+  })),
+});
+
 /* ─────────────────────────────────────────────────────────────────────────
    Derived helpers
 ──────────────────────────────────────────────────────────────────────────── */
@@ -178,10 +198,14 @@ export const getProductById = async (
   }
 };
 
-export const saveProduct = async (product: Product): Promise<void> => {
+export const saveProduct = async (
+  product: Product,
+  options?: { isNew?: boolean },
+): Promise<void> => {
+  const isNew = !!options?.isNew;
   try {
-    await apiRequest(`/products/${product.id}`, {
-      method: "PUT",
+    await apiRequest(isNew ? "/products" : `/products/${product.id}`, {
+      method: isNew ? "POST" : "PUT",
       body: JSON.stringify(product),
     });
   } catch {

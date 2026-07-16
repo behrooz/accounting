@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getProductById, type Product } from "@/lib/products";
 import ProductEditor from "@/components/ProductEditor";
 
@@ -28,6 +28,7 @@ function makeEmptyProduct(): Product {
 export default function ProductEditorPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -36,6 +37,18 @@ export default function ProductEditorPage() {
   useEffect(() => {
     const load = async () => {
       if (id === "new") {
+        if (searchParams?.get("copy") === "1" && typeof window !== "undefined") {
+          const raw = sessionStorage.getItem("accounting-product-copy");
+          if (raw) {
+            try {
+              setProduct(JSON.parse(raw) as Product);
+              sessionStorage.removeItem("accounting-product-copy");
+              return;
+            } catch {
+              sessionStorage.removeItem("accounting-product-copy");
+            }
+          }
+        }
         setProduct(makeEmptyProduct());
         return;
       }
@@ -47,7 +60,7 @@ export default function ProductEditorPage() {
       }
     };
     void load();
-  }, [id]);
+  }, [id, searchParams]);
 
   if (notFound) {
     return (

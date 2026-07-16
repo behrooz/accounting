@@ -216,22 +216,25 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
       return;
     }
     const allowVariantImages = product.attributes.some((a) => a.allowImage);
-    await saveProduct({
-      ...product,
-      name: trimmed,
-      categoryId: product.categoryId || null,
-      images: product.images ?? [],
-      attributes: product.attributes.map((a) => ({
-        ...a,
-        allowImage: !!a.allowImage,
-      })),
-      variants: allowVariantImages
-        ? product.variants
-        : product.variants.map((v) => {
-            const { image: _image, ...rest } = v;
-            return rest;
-          }),
-    });
+    await saveProduct(
+      {
+        ...product,
+        name: trimmed,
+        categoryId: product.categoryId || null,
+        images: product.images ?? [],
+        attributes: product.attributes.map((a) => ({
+          ...a,
+          allowImage: !!a.allowImage,
+        })),
+        variants: allowVariantImages
+          ? product.variants
+          : product.variants.map((v) => {
+              const { image: _image, ...rest } = v;
+              return rest;
+            }),
+      },
+      { isNew },
+    );
     router.push("/products/manage");
   };
 
