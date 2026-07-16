@@ -49,7 +49,7 @@ export function gregorianISOToJalali(iso: string, format = "YYYY/MM/DD") {
 }
 
 /**
- * DatePicker selection → API YYYY-MM-DD (Gregorian).
+ * DatePicker selection → API YYYY-MM-DD (Gregorian, ASCII digits).
  * Returns "" if the value is incomplete / invalid so filters are not applied wrongly.
  */
 export function jalaliToGregorianISO(
@@ -57,14 +57,14 @@ export function jalaliToGregorianISO(
 ): string {
   if (!dateObj || Array.isArray(dateObj)) return "";
   try {
-    const d = new DateObject(dateObj).convert(gregorian);
-    if (!d.isValid) return "";
-    const out = d.format("YYYY-MM-DD");
-    // Guard against accidental Jalali year leaking into ISO (e.g. 1405-04-25)
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(out)) return "";
-    const year = Number(out.slice(0, 4));
+    // toDate() yields a real JS Date in local time — avoids Persian-digit format issues
+    const js = new DateObject(dateObj).toDate();
+    if (Number.isNaN(js.getTime())) return "";
+    const year = js.getFullYear();
+    const month = js.getMonth() + 1;
+    const day = js.getDate();
     if (year < 1900 || year > 2100) return "";
-    return out;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   } catch {
     return "";
   }

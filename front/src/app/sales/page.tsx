@@ -123,10 +123,13 @@ const emptyFilters = (): SalesFilters => ({
 function applySalesFilters(invs: Invoice[], f: SalesFilters): Invoice[] {
   const numQ = f.invoiceNumber.trim().toLowerCase();
   const nameQ = f.customerName.trim().toLowerCase();
+  const from = normalizeGregorianISO(f.dateFrom);
+  const to = normalizeGregorianISO(f.dateTo);
   return invs.filter((inv) => {
     const invDay = normalizeGregorianISO(inv.date);
-    if (f.dateFrom && invDay && invDay < f.dateFrom) return false;
-    if (f.dateTo && invDay && invDay > f.dateTo) return false;
+    if ((from || to) && !invDay) return false;
+    if (from && invDay < from) return false;
+    if (to && invDay > to) return false;
     if (numQ && !(inv.number || "").toLowerCase().includes(numQ)) return false;
     if (nameQ && !(inv.customerName || "").toLowerCase().includes(nameQ)) return false;
     return true;
