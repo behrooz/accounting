@@ -92,11 +92,42 @@ export const nextInvoiceNumber = async (): Promise<string> => {
 
 /* ─── localStorage ────────────────────────────────────────────────────── */
 
-export const getInvoices = async (): Promise<Invoice[]> => {
+export type InvoiceListFilters = {
+  dateFrom?: string;
+  dateTo?: string;
+  number?: string;
+  customerName?: string;
+};
+
+export const getInvoices = async (
+  filters?: InvoiceListFilters,
+): Promise<Invoice[]> => {
   try {
-    return await apiRequest<Invoice[]>("/invoices");
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.set("dateFrom", filters.dateFrom);
+    if (filters?.dateTo) params.set("dateTo", filters.dateTo);
+    if (filters?.number) params.set("number", filters.number);
+    if (filters?.customerName) params.set("customerName", filters.customerName);
+    const qs = params.toString();
+    return await apiRequest<Invoice[]>(`/invoices${qs ? `?${qs}` : ""}`);
   } catch {
-    return localGetInvoices();
+    // local fallback: apply same filters client-side
+    let all = localGetInvoices();
+    if (filters?.dateFrom) {
+      all = all.filter((i) => (i.date || "").slice(0, 10) >= filters.dateFrom!);
+    }
+    if (filters?.dateTo) {
+      all = all.filter((i) => (i.date || "").slice(0, 10) <= filters.dateTo!);
+    }
+    if (filters?.number) {
+      const q = filters.number.toLowerCase();
+      all = all.filter((i) => (i.number || "").toLowerCase().includes(q));
+    }
+    if (filters?.customerName) {
+      const q = filters.customerName.toLowerCase();
+      all = all.filter((i) => (i.customerName || "").toLowerCase().includes(q));
+    }
+    return all;
   }
 };
 

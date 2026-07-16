@@ -47,14 +47,48 @@ type itemRow struct {
 	UpdatedAt    string `db:"updated_at"`
 }
 
-func ListInvoices(db *sqlx.DB) ([]models.Invoice, error) {
-	var rows []invoiceRow
-	if err := db.Select(&rows, "SELECT * FROM invoices ORDER BY date DESC, created_at DESC"); err != nil {
+type InvoiceListFilter struct {
+	DateFrom     string
+	DateTo       string
+	Number       string
+	CustomerName string
+}
+
+func ListInvoices(db *sqlx.DB, f InvoiceListFilter) ([]models.Invoice, error) {
+	q := "SELECT id FROM invoices WHERE 1=1"
+	args := make([]any, 0, 4)
+
+	if from := strings.TrimSpace(f.DateFrom); from != "" {
+		if len(from) >= 10 {
+			from = from[:10]
+		}
+		q += " AND date >= ?"
+		args = append(args, from)
+	}
+	if to := strings.TrimSpace(f.DateTo); to != "" {
+		if len(to) >= 10 {
+			to = to[:10]
+		}
+		q += " AND date <= ?"
+		args = append(args, to)
+	}
+	if num := strings.TrimSpace(f.Number); num != "" {
+		q += " AND number LIKE ?"
+		args = append(args, "%"+num+"%")
+	}
+	if name := strings.TrimSpace(f.CustomerName); name != "" {
+		q += " AND customer_name LIKE ?"
+		args = append(args, "%"+name+"%")
+	}
+	q += " ORDER BY date DESC, created_at DESC"
+
+	var ids []string
+	if err := db.Select(&ids, q, args...); err != nil {
 		return nil, err
 	}
-	out := make([]models.Invoice, 0, len(rows))
-	for _, r := range rows {
-		inv, err := GetInvoice(db, r.ID)
+	out := make([]models.Invoice, 0, len(ids))
+	for _, id := range ids {
+		inv, err := GetInvoice(db, id)
 		if err != nil {
 			return nil, err
 		}

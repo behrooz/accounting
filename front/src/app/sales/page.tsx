@@ -12,7 +12,7 @@ import {
   themeQuartz,
 } from "ag-grid-community";
 import { deleteInvoice, getInvoices, type Invoice } from "@/lib/invoices";
-import { gregorianISOToJalali, normalizeGregorianISO } from "@/lib/jalali";
+import { gregorianISOToJalali } from "@/lib/jalali";
 import ShamsiDatePicker from "@/components/ShamsiDatePicker";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -120,65 +120,49 @@ const emptyFilters = (): SalesFilters => ({
   customerName: "",
 });
 
-function applySalesFilters(invs: Invoice[], f: SalesFilters): Invoice[] {
-  const numQ = f.invoiceNumber.trim().toLowerCase();
-  const nameQ = f.customerName.trim().toLowerCase();
-  const from = normalizeGregorianISO(f.dateFrom);
-  const to = normalizeGregorianISO(f.dateTo);
-  return invs.filter((inv) => {
-    const invDay = normalizeGregorianISO(inv.date);
-    if ((from || to) && !invDay) return false;
-    if (from && invDay < from) return false;
-    if (to && invDay > to) return false;
-    if (numQ && !(inv.number || "").toLowerCase().includes(numQ)) return false;
-    if (nameQ && !(inv.customerName || "").toLowerCase().includes(nameQ)) return false;
-    return true;
-  });
-}
-
 export default function SalesPage() {
   const router = useRouter();
   const gridRef = useRef<AgGridReact<Invoice>>(null);
-  const dataRef = useRef<Invoice[]>([]);
   const [rowData, setRowData] = useState<Invoice[]>([]);
   const [filters, setFilters] = useState<SalesFilters>(emptyFilters);
+  const [loading, setLoading] = useState(false);
 
-  const applyFilters = useCallback((all: Invoice[], next: SalesFilters) => {
-    setRowData(applySalesFilters(all, next));
+  const fetchFromServer = useCallback(async (f: SalesFilters) => {
+    setLoading(true);
+    try {
+      const invs = await getInvoices({
+        dateFrom: f.dateFrom || undefined,
+        dateTo: f.dateTo || undefined,
+        number: f.invoiceNumber.trim() || undefined,
+        customerName: f.customerName.trim() || undefined,
+      });
+      setRowData(invs);
+    } catch (err) {
+      console.error(err);
+      setRowData([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  // Every filter change → request server (debounced for typing)
   useEffect(() => {
-    const load = async () => {
-      const invs = await getInvoices();
-      dataRef.current = invs;
-      applyFilters(invs, filters);
-    };
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load only
-  }, []);
-
-  const reload = useCallback(async () => {
-    const invs = await getInvoices();
-    dataRef.current = invs;
-    applyFilters(invs, filters);
-  }, [applyFilters, filters]);
+    const t = setTimeout(() => {
+      void fetchFromServer(filters);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [filters, fetchFromServer]);
 
   const updateFilter = useCallback(
     <K extends keyof SalesFilters>(key: K, value: SalesFilters[K]) => {
-      setFilters((prev) => {
-        const next = { ...prev, [key]: value };
-        applyFilters(dataRef.current, next);
-        return next;
-      });
+      setFilters((prev) => ({ ...prev, [key]: value }));
     },
-    [applyFilters],
+    [],
   );
 
   const clearFilters = useCallback(() => {
-    const next = emptyFilters();
-    setFilters(next);
-    applyFilters(dataRef.current, next);
-  }, [applyFilters]);
+    setFilters(emptyFilters());
+  }, []);
 
   const handleEdit = useCallback((id: string) => router.push(`/sales/${id}`), [router]);
 
@@ -187,8 +171,8 @@ export default function SalesPage() {
   const handleDelete = useCallback(async (id: string) => {
     if (!window.confirm("آیا از حذف این فاکتور مطمئن هستید؟")) return;
     await deleteInvoice(id);
-    await reload();
-  }, [reload]);
+    await fetchFromServer(filters);
+  }, [fetchFromServer, filters]);
 
   const getRowId = useCallback((p: GetRowIdParams<Invoice>) => p.data.id, []);
 
@@ -217,6 +201,9 @@ export default function SalesPage() {
             {hasActiveFilters ? " (فیلتر‌شده)" : ""}
             :{" "}
             <span className="font-semibold text-[#1d8102]">{fa(confirmedTotal)} تومان</span>
+            {loading ? (
+              <span className="mr-2 text-xs text-[#879596]">در حال بارگذاری…</span>
+            ) : null}
           </p>
         </div>
         <button
@@ -294,7 +281,7 @@ export default function SalesPage() {
       </div>
       <p className="text-xs text-[#879596]">
         {rowData.length} فاکتور
-        {hasActiveFilters ? ` از ${dataRef.current.length}` : " ثبت‌شده"}
+        {hasActiveFilters ? " (نتیجه فیلتر سرور)" : " ثبت‌شده"}
       </p>
     </div>
   );

@@ -484,7 +484,12 @@ func main() {
 
 	// Invoices
 	authed.GET("/invoices", func(c *gin.Context) {
-		invs, err := repo.ListInvoices(database)
+		invs, err := repo.ListInvoices(database, repo.InvoiceListFilter{
+			DateFrom:     c.Query("dateFrom"),
+			DateTo:       c.Query("dateTo"),
+			Number:       c.Query("number"),
+			CustomerName: c.Query("customerName"),
+		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error", "detail": err.Error()})
 			return
