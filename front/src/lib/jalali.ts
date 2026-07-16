@@ -3,16 +3,46 @@ import gregorian from "react-date-object/calendars/gregorian";
 import persian from "react-date-object/calendars/persian";
 import persian_fa from "react-date-object/locales/persian_fa";
 
-/** API date (YYYY-MM-DD Gregorian) → Shamsi display string with Persian digits. */
+/** Normalize API/DB date strings to YYYY-MM-DD (Gregorian). */
+export function normalizeGregorianISO(input: string): string {
+  if (!input) return "";
+  const s = String(input).trim();
+  // YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss... or YYYY-MM-DD HH:mm:ss
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return "";
+}
+
+function localDateFromISO(iso: string): Date | null {
+  const norm = normalizeGregorianISO(iso);
+  if (!norm) return null;
+  const [y, m, d] = norm.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+/** API date (YYYY-MM-DD Gregorian, optionally with time) → Shamsi with Persian digits. */
 export function gregorianISOToJalali(iso: string, format = "YYYY/MM/DD") {
   if (!iso) return "";
+  const norm = normalizeGregorianISO(iso);
+  if (!norm) return "";
+
   try {
     const d = new DateObject({
-      date: iso,
+      date: norm,
       format: "YYYY-MM-DD",
       calendar: gregorian,
     }).convert(persian, persian_fa);
-    return d.isValid ? d.format(format) : "";
+    if (d.isValid) return d.format(format);
+  } catch {
+    // fall through
+  }
+
+  // Fallback: browser Intl (still Shamsi + Persian digits via fa-IR)
+  const dt = localDateFromISO(norm);
+  if (!dt) return "";
+  try {
+    return dt.toLocaleDateString("fa-IR");
   } catch {
     return "";
   }
@@ -42,10 +72,11 @@ export function jalaliToGregorianISO(
 
 /** Controlled DatePicker value from API ISO date. */
 export function isoToPersianDateObject(iso: string): DateObject | undefined {
-  if (!iso) return undefined;
+  const norm = normalizeGregorianISO(iso);
+  if (!norm) return undefined;
   try {
     const d = new DateObject({
-      date: iso,
+      date: norm,
       format: "YYYY-MM-DD",
       calendar: gregorian,
     }).convert(persian, persian_fa);

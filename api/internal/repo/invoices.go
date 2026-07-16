@@ -2,6 +2,7 @@ package repo
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"accounting-api/internal/models"
@@ -88,7 +89,7 @@ func GetInvoice(db *sqlx.DB, id string) (*models.Invoice, error) {
 	return &models.Invoice{
 		ID:              r.ID,
 		Number:          r.Number,
-		Date:            r.Date,
+		Date:            normalizeDate(r.Date),
 		CustomerID:      r.CustomerID,
 		CustomerName:    r.CustomerName,
 		CustomerPhone:   r.CustomerPhone,
@@ -105,6 +106,21 @@ func GetInvoice(db *sqlx.DB, id string) (*models.Invoice, error) {
 		PaymentMethod:   r.PaymentMethod,
 		CreatedAt:       r.CreatedAt,
 	}, nil
+}
+
+// normalizeDate keeps Gregorian YYYY-MM-DD even if MySQL returns a datetime string.
+func normalizeDate(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 10 && s[4] == '-' && s[7] == '-' {
+		return s[:10]
+	}
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t.Format("2006-01-02")
+	}
+	if t, err := time.Parse("2006-01-02 15:04:05", s); err == nil {
+		return t.Format("2006-01-02")
+	}
+	return s
 }
 
 func coalesceSource(s string) string {

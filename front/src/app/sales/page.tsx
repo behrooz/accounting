@@ -12,7 +12,7 @@ import {
   themeQuartz,
 } from "ag-grid-community";
 import { deleteInvoice, getInvoices, type Invoice } from "@/lib/invoices";
-import { gregorianISOToJalali } from "@/lib/jalali";
+import { gregorianISOToJalali, normalizeGregorianISO } from "@/lib/jalali";
 import ShamsiDatePicker from "@/components/ShamsiDatePicker";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -79,11 +79,21 @@ const ActionCellRenderer = ({ data, context }: ICellRendererParams) => {
 };
 
 const fa = (n: number) => Math.round(n).toLocaleString("fa-IR");
-const faDate = (d: string) => gregorianISOToJalali(d, "YYYY/MM/DD");
+const faDate = (d: unknown) => {
+  if (d == null || d === "") return "—";
+  const shamsi = gregorianISOToJalali(String(d), "YYYY/MM/DD");
+  return shamsi || "—";
+};
 
 const COLUMN_DEFS: ColDef<Invoice>[] = [
   { field: "number", headerName: "شماره فاکتور", editable: false, width: 140, filter: "agTextColumnFilter" },
-  { field: "date", headerName: "تاریخ", editable: false, width: 120, valueFormatter: (p) => faDate(p.value as string) },
+  {
+    field: "date",
+    headerName: "تاریخ",
+    editable: false,
+    width: 130,
+    valueFormatter: (p) => faDate(p.value),
+  },
   { field: "customerName", headerName: "مشتری", editable: false, flex: 1, minWidth: 140, filter: "agTextColumnFilter", valueFormatter: (p) => (p.value as string) || "—" },
   { field: "customerPhone", headerName: "تلفن", editable: false, width: 120, filter: "agTextColumnFilter", valueFormatter: (p) => (p.value as string) || "—" },
   { field: "source", headerName: "منبع", editable: false, width: 130, cellRenderer: (p: ICellRendererParams) => <SourceBadge value={p.value as string} /> },
@@ -114,8 +124,9 @@ function applySalesFilters(invs: Invoice[], f: SalesFilters): Invoice[] {
   const numQ = f.invoiceNumber.trim().toLowerCase();
   const nameQ = f.customerName.trim().toLowerCase();
   return invs.filter((inv) => {
-    if (f.dateFrom && inv.date < f.dateFrom) return false;
-    if (f.dateTo && inv.date > f.dateTo) return false;
+    const invDay = normalizeGregorianISO(inv.date);
+    if (f.dateFrom && invDay && invDay < f.dateFrom) return false;
+    if (f.dateTo && invDay && invDay > f.dateTo) return false;
     if (numQ && !(inv.number || "").toLowerCase().includes(numQ)) return false;
     if (nameQ && !(inv.customerName || "").toLowerCase().includes(nameQ)) return false;
     return true;
