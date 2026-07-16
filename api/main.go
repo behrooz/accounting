@@ -50,6 +50,9 @@ func main() {
 	if err := repo.EnsureStorefrontSchema(database); err != nil {
 		panic(err)
 	}
+	if err := repo.EnsureShopSettings(database); err != nil {
+		panic(err)
+	}
 
 	// seed default admin (admin / 123456)
 	hash, _ := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
@@ -257,6 +260,35 @@ func main() {
 	authed.GET("/me", func(c *gin.Context) {
 		u := c.MustGet(httpx.CtxUserKey).(httpx.SessionUser)
 		c.JSON(http.StatusOK, u)
+	})
+
+	// Shop / sender profile (used on shipping labels)
+	authed.GET("/shop-settings", func(c *gin.Context) {
+		s, err := repo.GetShopSettings(database)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		c.JSON(http.StatusOK, s)
+	})
+	authed.PUT("/shop-settings", func(c *gin.Context) {
+		var body repo.ShopSettings
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		body.Name = strings.TrimSpace(body.Name)
+		body.Phone = strings.TrimSpace(body.Phone)
+		body.Address = strings.TrimSpace(body.Address)
+		if body.Name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "name required"})
+			return
+		}
+		if err := repo.UpsertShopSettings(database, body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
 	// Product image upload → assets/product/<file>, DB stores relative path

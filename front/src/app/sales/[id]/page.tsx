@@ -14,21 +14,24 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [notFound, setNotFound] = useState(false);
 
+  const printMode =
+    searchParams?.get("label") === "1"
+      ? "label"
+      : searchParams?.get("print") === "1"
+        ? "invoice"
+        : null;
+
   useEffect(() => {
     const load = async () => {
       const found = await getInvoiceById(id);
       if (found) {
         setInvoice(found);
-        // If ?print=1, trigger print after render
-        if (searchParams?.get("print") === "1") {
-          setTimeout(() => window.print(), 400);
-        }
       } else {
         setNotFound(true);
       }
     };
     void load();
-  }, [id, searchParams]);
+  }, [id]);
 
   if (notFound) {
     return (
@@ -52,5 +55,11 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  return <InvoiceEditor initialInvoice={invoice} isNew={false} />;
+  return (
+    <InvoiceEditor
+      initialInvoice={invoice}
+      isNew={false}
+      initialPrintMode={printMode}
+    />
+  );
 }

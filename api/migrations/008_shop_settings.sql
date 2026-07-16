@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS shop_settings (
+  id TINYINT NOT NULL PRIMARY KEY DEFAULT 1,
+  name VARCHAR(255) NOT NULL DEFAULT '',
+  phone VARCHAR(64) NOT NULL DEFAULT '',
+  address TEXT NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO shop_settings (id, name, phone, address)
+VALUES (1, 'فروشگاه آبرنگ', '', '');

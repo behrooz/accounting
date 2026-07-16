@@ -14,6 +14,7 @@ import {
 } from "@/lib/invoices";
 import { gregorianISOToJalali } from "@/lib/jalali";
 import ShamsiDatePicker from "@/components/ShamsiDatePicker";
+import { getShopSettings, type ShopSettings } from "@/lib/shop";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Local item state (same shape as InvoiceItem)
@@ -56,19 +57,33 @@ const fa = (n: number) => Math.round(n).toLocaleString("fa-IR");
 type Props = {
   initialInvoice?: Invoice;
   isNew?: boolean;
+  /** When opening via ?label=1 or ?print=1 */
+  initialPrintMode?: "invoice" | "label" | null;
 };
 
 /* ─────────────────────────────────────────────────────────────────────────
    Component
 ──────────────────────────────────────────────────────────────────────────── */
 
-export default function InvoiceEditor({ initialInvoice, isNew = true }: Props) {
+export default function InvoiceEditor({
+  initialInvoice,
+  isNew = true,
+  initialPrintMode = null,
+}: Props) {
   const router = useRouter();
   const invoiceId = useRef(initialInvoice?.id ?? crypto.randomUUID());
 
   /* ── Data from localStorage ─────────────────────────────────────────── */
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [shop, setShop] = useState<ShopSettings>({
+    name: "",
+    phone: "",
+    address: "",
+  });
+  const [printMode, setPrintMode] = useState<"invoice" | "label">(
+    initialPrintMode === "label" ? "label" : "invoice",
+  );
 
   // Product picker state
   const [activeProductPicker, setActiveProductPicker] = useState<string | null>(
@@ -104,10 +119,18 @@ export default function InvoiceEditor({ initialInvoice, isNew = true }: Props) {
     const load = async () => {
       setProducts(await getProducts());
       setCustomers(await getCustomers());
+      setShop(await getShopSettings());
       if (isNew) setInvNumber(await nextInvoiceNumber());
     };
     void load();
   }, [isNew]);
+
+  useEffect(() => {
+    if (!initialPrintMode) return;
+    setPrintMode(initialPrintMode === "label" ? "label" : "invoice");
+    const t = setTimeout(() => window.print(), 450);
+    return () => clearTimeout(t);
+  }, [initialPrintMode]);
 
   /* ── Customer select → auto-fill fields ─────────────────────────────── */
   const handleCustomerSelect = (id: string) => {
@@ -262,7 +285,23 @@ export default function InvoiceEditor({ initialInvoice, isNew = true }: Props) {
     router.push("/sales");
   };
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    setPrintMode("invoice");
+    setTimeout(() => window.print(), 50);
+  };
+
+  const handlePrintLabel = () => {
+    if (!customerName.trim() && !customerPhone.trim() && !customerAddress.trim()) {
+      alert("اطلاعات مشتری (گیرنده) برای برچسب بسته ناقص است.");
+      return;
+    }
+    if (!shop.name.trim()) {
+      alert("اطلاعات فروشگاه را از منوی «اطلاعات فروشگاه» تکمیل کنید.");
+      return;
+    }
+    setPrintMode("label");
+    setTimeout(() => window.print(), 50);
+  };
 
   /* ── Input class helper ──────────────────────────────────────────────── */
   const inp =
@@ -296,12 +335,20 @@ export default function InvoiceEditor({ initialInvoice, isNew = true }: Props) {
               انصراف
             </button>
             {!isNew && (
-              <button
-                onClick={handlePrint}
-                className="rounded border border-[#0073bb] bg-white px-4 py-2 text-sm font-medium text-[#0073bb] hover:bg-[#e7f2f8] transition"
-              >
-                چاپ فاکتور
-              </button>
+              <>
+                <button
+                  onClick={handlePrint}
+                  className="rounded border border-[#0073bb] bg-white px-4 py-2 text-sm font-medium text-[#0073bb] hover:bg-[#e7f2f8] transition"
+                >
+                  چاپ فاکتور
+                </button>
+                <button
+                  onClick={handlePrintLabel}
+                  className="rounded border border-[#1d8102] bg-white px-4 py-2 text-sm font-medium text-[#1d8102] hover:bg-[#ebf6e8] transition"
+                >
+                  برچسب بسته
+                </button>
+              </>
             )}
             <button
               onClick={() => void handleSave("draft")}
@@ -736,9 +783,13 @@ export default function InvoiceEditor({ initialInvoice, isNew = true }: Props) {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
-          PRINT VIEW  (only visible when window.print() is called)
+          PRINT VIEW — invoice
       ══════════════════════════════════════════════════════════════════ */}
-      <div className="hidden print:block bg-white text-[#16191f]">
+      <div
+        className={`${
+          printMode === "invoice" ? "hidden print:block" : "hidden"
+        } bg-white text-[#16191f]`}
+      >
         <div className="mx-auto max-w-[780px] p-10">
           {/* Header */}
           <div className="mb-8 flex items-start justify-between border-b-2 border-[#16191f] pb-5">
@@ -876,6 +927,62 @@ export default function InvoiceEditor({ initialInvoice, isNew = true }: Props) {
           <p className="mt-8 text-center text-[10px] text-[#879596]">
             این فاکتور توسط سیستم حسابداری صادر شده است.
           </p>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          PRINT VIEW — shipping / package label
+      ══════════════════════════════════════════════════════════════════ */}
+      <div
+        className={`${
+          printMode === "label" ? "hidden print:block" : "hidden"
+        } bg-white text-[#16191f]`}
+      >
+        <div className="mx-auto max-w-[420px] p-6">
+          <div className="overflow-hidden rounded-lg border-2 border-[#16191f]">
+            <div className="border-b-2 border-[#16191f] bg-[#f2f3f3] px-4 py-2 text-center text-sm font-bold">
+              برچسب بسته پستی
+              {invNumber ? (
+                <span className="mr-2 font-normal text-[#545b64]">
+                  ({invNumber})
+                </span>
+              ) : null}
+            </div>
+
+            <div className="border-b-2 border-dashed border-[#aab7b8] p-4">
+              <p className="mb-2 text-xs font-bold text-[#0073bb]">فرستنده</p>
+              <p className="text-base font-bold">{shop.name || "—"}</p>
+              {shop.phone ? (
+                <p className="mt-1 text-sm tabular-nums" dir="ltr">
+                  {shop.phone}
+                </p>
+              ) : null}
+              {shop.address ? (
+                <p className="mt-2 text-sm leading-6 text-[#16191f]">
+                  {shop.address}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="p-4">
+              <p className="mb-2 text-xs font-bold text-[#1d8102]">گیرنده</p>
+              <p className="text-lg font-bold">
+                {customerName || "—"}
+              </p>
+              {customerPhone ? (
+                <p className="mt-1 text-sm tabular-nums" dir="ltr">
+                  {customerPhone}
+                </p>
+              ) : null}
+              {customerAddress ? (
+                <p className="mt-2 text-sm leading-6 text-[#16191f]">
+                  {customerAddress}
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-[#879596]">آدرس ثبت نشده</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </>

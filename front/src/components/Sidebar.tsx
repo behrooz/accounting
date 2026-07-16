@@ -21,6 +21,7 @@ const NAV = [
     items: [
       { label: "فاکتورها / سفارش‌ها", href: "/sales" },
       { label: "مشتریان", href: "/customers" },
+      { label: "اطلاعات فروشگاه", href: "/settings" },
     ],
   },
 ];

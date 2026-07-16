@@ -36,6 +36,7 @@ const gridTheme = themeQuartz.withParams({
 type GridCtx = {
   handleEdit: (id: string) => void;
   handlePrint: (id: string) => void;
+  handleLabel: (id: string) => void;
   handleDelete: (id: string) => void;
 };
 
@@ -70,6 +71,10 @@ const ActionCellRenderer = ({ data, context }: ICellRendererParams) => {
         className="rounded border border-[#aab7b8] bg-white px-2.5 py-1 text-xs font-medium text-[#545b64] hover:bg-[#f2f3f3] transition">
         چاپ
       </button>
+      <button onClick={() => ctx.handleLabel(inv.id)}
+        className="rounded border border-[#1d8102] bg-white px-2.5 py-1 text-xs font-medium text-[#1d8102] hover:bg-[#ebf6e8] transition">
+        برچسب بسته
+      </button>
       <button onClick={() => ctx.handleDelete(inv.id)}
         className="rounded border border-[#d13212] bg-white px-2.5 py-1 text-xs font-medium text-[#d13212] hover:bg-[#fdf3f1] transition">
         حذف
@@ -101,7 +106,7 @@ const COLUMN_DEFS: ColDef<Invoice>[] = [
   { field: "subtotal", headerName: "جمع اقلام", editable: false, width: 140, sortable: true, valueFormatter: (p) => fa(p.value as number) + " تومان" },
   { field: "total", headerName: "قابل پرداخت", editable: false, width: 150, sortable: true, valueFormatter: (p) => fa(p.value as number) + " تومان" },
   { field: "status", headerName: "وضعیت", editable: false, width: 110, cellRenderer: (p: ICellRendererParams) => <StatusBadge value={p.value as string} /> },
-  { headerName: "عملیات", cellRenderer: ActionCellRenderer, sortable: false, filter: false, width: 220, editable: false, resizable: false },
+  { headerName: "عملیات", cellRenderer: ActionCellRenderer, sortable: false, filter: false, width: 300, editable: false, resizable: false },
 ];
 
 const DEFAULT_COL_DEF: ColDef<Invoice> = { sortable: true, resizable: true, filter: true };
@@ -168,6 +173,8 @@ export default function SalesPage() {
 
   const handlePrint = useCallback((id: string) => router.push(`/sales/${id}?print=1`), [router]);
 
+  const handleLabel = useCallback((id: string) => router.push(`/sales/${id}?label=1`), [router]);
+
   const handleDelete = useCallback(async (id: string) => {
     if (!window.confirm("آیا از حذف این فاکتور مطمئن هستید؟")) return;
     await deleteInvoice(id);
@@ -176,7 +183,7 @@ export default function SalesPage() {
 
   const getRowId = useCallback((p: GetRowIdParams<Invoice>) => p.data.id, []);
 
-  const gridCtx: GridCtx = { handleEdit, handlePrint, handleDelete };
+  const gridCtx: GridCtx = { handleEdit, handlePrint, handleLabel, handleDelete };
 
   const confirmedTotal = rowData
     .filter((i) => i.status === "confirmed")
