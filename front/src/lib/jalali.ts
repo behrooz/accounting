@@ -1,4 +1,5 @@
 import DateObject from "react-date-object";
+import gregorian from "react-date-object/calendars/gregorian";
 import persian from "react-date-object/calendars/persian";
 import persian_fa from "react-date-object/locales/persian_fa";
 
@@ -13,9 +14,9 @@ export function gregorianISOToJalali(iso: string, format = "YYYY/MM/DD") {
 // Convert selected date from react-multi-date-picker (persian calendar) to
 // API payload format (YYYY-MM-DD, Gregorian).
 export function jalaliToGregorianISO(dateObj: DateObject) {
-  // convert() without args => Gregorian
+  // Use explicit Gregorian calendar for TS-safe conversion.
   const d = new DateObject(dateObj);
-  d.convert();
+  d.convert(gregorian);
   return d.format("YYYY-MM-DD");
 }
 
