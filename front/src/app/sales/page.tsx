@@ -3,9 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AgGridReact } from "ag-grid-react";
-import DatePicker from "react-multi-date-picker";
-import persian from "react-date-object/calendars/persian";
-import persian_fa from "react-date-object/locales/persian_fa";
 import {
   AllCommunityModule,
   ModuleRegistry,
@@ -15,7 +12,8 @@ import {
   themeQuartz,
 } from "ag-grid-community";
 import { deleteInvoice, getInvoices, type Invoice } from "@/lib/invoices";
-import { gregorianISOToJalali, jalaliToGregorianISO, isoToLocalDate } from "@/lib/jalali";
+import { gregorianISOToJalali } from "@/lib/jalali";
+import ShamsiDatePicker from "@/components/ShamsiDatePicker";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -217,34 +215,22 @@ export default function SalesPage() {
 
       <div className="rounded border border-[#d5dbdb] bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="flex min-w-[140px] flex-col gap-1 text-xs font-medium text-[#545b64]">
-            از تاریخ
-            <DatePicker
-              calendar={persian}
-              locale={persian_fa}
-              format="YYYY/MM/DD"
-              value={filters.dateFrom ? isoToLocalDate(filters.dateFrom) : undefined}
-              onChange={(d) => {
-                if (!d) return updateFilter("dateFrom", "");
-                updateFilter("dateFrom", jalaliToGregorianISO(d));
-              }}
-              inputClass={inputCls}
+          <div className="flex min-w-[160px] flex-col gap-1 text-xs font-medium text-[#545b64]">
+            <span>از تاریخ</span>
+            <ShamsiDatePicker
+              value={filters.dateFrom}
+              onChange={(iso) => updateFilter("dateFrom", iso)}
+              inputClassName={inputCls}
             />
-          </label>
-          <label className="flex min-w-[140px] flex-col gap-1 text-xs font-medium text-[#545b64]">
-            تا تاریخ
-            <DatePicker
-              calendar={persian}
-              locale={persian_fa}
-              format="YYYY/MM/DD"
-              value={filters.dateTo ? isoToLocalDate(filters.dateTo) : undefined}
-              onChange={(d) => {
-                if (!d) return updateFilter("dateTo", "");
-                updateFilter("dateTo", jalaliToGregorianISO(d));
-              }}
-              inputClass={inputCls}
+          </div>
+          <div className="flex min-w-[160px] flex-col gap-1 text-xs font-medium text-[#545b64]">
+            <span>تا تاریخ</span>
+            <ShamsiDatePicker
+              value={filters.dateTo}
+              onChange={(iso) => updateFilter("dateTo", iso)}
+              inputClassName={inputCls}
             />
-          </label>
+          </div>
           <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-xs font-medium text-[#545b64]">
             شماره فاکتور
             <input

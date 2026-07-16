@@ -2,9 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import DatePicker from "react-multi-date-picker";
-import persian from "react-date-object/calendars/persian";
-import persian_fa from "react-date-object/locales/persian_fa";
 import { getProducts, type Product } from "@/lib/products";
 import { getCustomers, type Customer } from "@/lib/customers";
 import {
@@ -15,7 +12,8 @@ import {
   type Invoice,
   type InvoiceItem,
 } from "@/lib/invoices";
-import { gregorianISOToJalali, jalaliToGregorianISO, isoToLocalDate } from "@/lib/jalali";
+import { gregorianISOToJalali } from "@/lib/jalali";
+import ShamsiDatePicker from "@/components/ShamsiDatePicker";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Local item state (same shape as InvoiceItem)
@@ -38,11 +36,14 @@ function emptyItem(): ItemRow {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function faDate(iso: string) {
-  // Show Jalali (Shamsi) date using Persian digits
   return gregorianISOToJalali(iso, "YYYY/MM/DD");
 }
 
@@ -337,22 +338,16 @@ export default function InvoiceEditor({ initialInvoice, isNew = true }: Props) {
                   className={inp}
                 />
               </label>
-              <label className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-[#545b64]">
                   تاریخ
                 </span>
-                <DatePicker
-                  calendar={persian}
-                  locale={persian_fa}
-                  format="YYYY/MM/DD"
-                  value={date ? isoToLocalDate(date) : undefined}
-                  onChange={(d) => {
-                    if (!d) return setDate("");
-                    setDate(jalaliToGregorianISO(d));
-                  }}
-                  inputClass={inp}
+                <ShamsiDatePicker
+                  value={date}
+                  onChange={setDate}
+                  inputClassName={inp}
                 />
-              </label>
+              </div>
               <label className="flex flex-col gap-1.5 sm:col-span-2">
                 <span className="text-xs font-medium text-[#545b64]">
                   توضیحات
