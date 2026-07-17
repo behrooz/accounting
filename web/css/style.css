@@ -164,7 +164,7 @@ input {
   display: none;
 }
 
-/* Side menu drawer */
+/* Side menu drawer — opens from the physical right */
 .menu-drawer {
   position: fixed;
   inset: 0;
@@ -175,7 +175,6 @@ input {
 }
 
 .menu-drawer.is-open {
-  pointer-events: auto;
   visibility: visible;
 }
 
@@ -183,7 +182,8 @@ input {
   position: absolute;
   top: 0;
   bottom: 0;
-  inset-inline-end: 0;
+  right: 0;
+  left: auto;
   width: min(86vw, 360px);
   max-width: 100%;
   background: #fff;
@@ -195,10 +195,6 @@ input {
   overflow: hidden;
   pointer-events: auto;
   z-index: 81;
-}
-
-html[dir="rtl"] .menu-drawer-panel {
-  transform: translate3d(-100%, 0, 0);
 }
 
 .menu-drawer.is-open .menu-drawer-panel {
@@ -610,13 +606,19 @@ html[dir="rtl"] .menu-drawer-panel {
   left: -8px;
 }
 
-/* Cart drawer */
+/* Cart drawer — opens from the physical left */
 .overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
   z-index: 79;
   cursor: pointer;
+  pointer-events: auto;
+}
+
+.overlay[hidden] {
+  display: none !important;
+  pointer-events: none;
 }
 
 .cart-drawer {
@@ -629,7 +631,6 @@ html[dir="rtl"] .menu-drawer-panel {
 }
 
 .cart-drawer.is-open {
-  pointer-events: auto;
   visibility: visible;
 }
 
@@ -637,7 +638,8 @@ html[dir="rtl"] .menu-drawer-panel {
   position: absolute;
   top: 0;
   bottom: 0;
-  inset-inline-start: 0;
+  left: 0;
+  right: auto;
   width: min(92vw, 400px);
   max-width: 100%;
   background: #fff;
@@ -648,10 +650,6 @@ html[dir="rtl"] .menu-drawer-panel {
   box-shadow: 10px 0 36px rgba(0, 0, 0, 0.14);
   pointer-events: auto;
   z-index: 86;
-}
-
-html[dir="rtl"] .cart-drawer-panel {
-  transform: translate3d(100%, 0, 0);
 }
 
 .cart-drawer.is-open .cart-drawer-panel {
