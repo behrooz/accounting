@@ -30,7 +30,7 @@ RUN printf '%s\n' \
   && chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /tmp /etc/nginx/conf.d
 
 WORKDIR /usr/share/nginx/html
-COPY --chown=nginx:nginx index.html shop.html product.html checkout.html ./
+COPY --chown=nginx:nginx index.html shop.html product.html checkout.html account.html ./
 COPY --chown=nginx:nginx css ./css
 COPY --chown=nginx:nginx js ./js
 
