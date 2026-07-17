@@ -278,7 +278,16 @@ export default function VariantsGrid({
       filter: "agNumberColumnFilter",
       valueFormatter: (p) =>
         p.value != null ? Number(p.value).toLocaleString("fa-IR") : "",
-      valueParser: (p) => Number(p.newValue) || 0,
+      valueParser: (p) => {
+        const raw = String(p.newValue ?? "")
+          .trim()
+          .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+          .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+          .replace(/,/g, "")
+          .replace(/[^\d.-]/g, "");
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : 0;
+      },
       ...extra,
     });
 

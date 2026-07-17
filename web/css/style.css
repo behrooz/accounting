@@ -1156,6 +1156,20 @@ html[dir="rtl"] .cart-drawer-panel {
   box-shadow: inset 0 0 0 1px var(--red);
 }
 
+.pdp-color-chip.is-oos {
+  border-color: var(--red);
+  color: var(--red);
+  box-shadow: inset 0 0 0 1px var(--red);
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 0.95;
+}
+
+.pdp-color-chip.is-oos.is-active {
+  border-color: var(--red);
+  color: var(--red);
+}
+
 .pdp-color-chip.is-oos::before,
 .pdp-color-chip.is-oos::after {
   content: "";
@@ -1163,9 +1177,10 @@ html[dir="rtl"] .cart-drawer-panel {
   inset: 0;
   margin: auto;
   width: 118%;
-  height: 1px;
+  height: 1.5px;
   background: var(--red);
   pointer-events: none;
+  z-index: 1;
 }
 
 .pdp-color-chip.is-oos::before {
@@ -1174,6 +1189,10 @@ html[dir="rtl"] .cart-drawer-panel {
 
 .pdp-color-chip.is-oos::after {
   transform: rotate(-28deg);
+}
+
+.pdp-color-chip:disabled {
+  cursor: not-allowed;
 }
 
 .pdp-swatch {

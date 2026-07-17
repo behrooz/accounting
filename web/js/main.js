@@ -541,17 +541,29 @@
         var name = escapeHtml(a.name || "ویژگی");
         var chips = opts
           .map(function (o, idx) {
+            var oos = optionIsOutOfStock(product, o.label);
+            return { o: o, oos: oos, idx: idx };
+          });
+        var firstInStockAttr = chips.findIndex(function (c) {
+          return !c.oos;
+        });
+        if (firstInStockAttr < 0) firstInStockAttr = 0;
+        chips = chips
+          .map(function (c, idx) {
             return (
-              '<button type="button" class="js-attr pdp-swatch' +
-              (idx === 0 ? " is-active" : "") +
+              '<button type="button" class="js-attr pdp-swatch pdp-color-chip' +
+              (idx === firstInStockAttr ? " is-active" : "") +
+              (c.oos ? " is-oos" : "") +
               '" data-attr-id="' +
               escapeHtml(a.id) +
               '" data-attr-name="' +
               name +
               '" data-value="' +
-              escapeHtml(o.label) +
-              '"><span>' +
-              escapeHtml(o.label) +
+              escapeHtml(c.o.label) +
+              '"' +
+              (c.oos ? " disabled aria-disabled=\"true\"" : "") +
+              "><span>" +
+              escapeHtml(c.o.label) +
               "</span></button>"
             );
           })
@@ -685,12 +697,25 @@
       });
       var match = matching[0];
       var img = match && match.image ? resolve(match.image) : "";
-      var oos =
-        matching.length > 0 &&
-        matching.every(function (v) {
-          return Number(v.quantity) <= 0;
-        });
-      return { label: label, image: img, oos: oos };
+      // Out of stock when every matching variant has quantity 0 (or no stock field).
+      var totalQty = matching.reduce(function (sum, v) {
+        return sum + (Number(v.quantity) || 0);
+      }, 0);
+      var oos = matching.length > 0 && totalQty <= 0;
+      return { label: label, image: img, oos: oos, quantity: totalQty };
+    });
+  }
+
+  function optionIsOutOfStock(product, label) {
+    var matching = (product.variants || []).filter(function (v) {
+      var vals = v.attributeValues || {};
+      return Object.keys(vals).some(function (k) {
+        return String(vals[k]) === String(label);
+      });
+    });
+    if (!matching.length) return false;
+    return matching.every(function (v) {
+      return (Number(v.quantity) || 0) <= 0;
     });
   }
 
@@ -789,7 +814,7 @@
           escapeHtml(c.label) +
           '"' +
           (c.image ? ' data-image="' + c.image + '"' : "") +
-          (c.oos ? ' aria-disabled="true"' : "") +
+          (c.oos ? " disabled aria-disabled=\"true\"" : "") +
           ">" +
           escapeHtml(c.label) +
           "</button>"
@@ -997,9 +1022,15 @@
       else go(index - 1);
     });
 
-    // Color → jump to matching image if present
-    $page.on("click", ".js-color", function () {
-      var img = $(this).data("image");
+    // Color → jump to matching image if present (skip out-of-stock)
+    $page.on("click", ".js-color", function (e) {
+      var $btn = $(this);
+      if ($btn.hasClass("is-oos") || $btn.prop("disabled")) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      }
+      var img = $btn.data("image");
       if (!img) return;
       var i = images.indexOf(img);
       if (i >= 0) go(i);
@@ -1276,12 +1307,28 @@
         alert("این رنگ فعلاً موجود نیست.");
         return;
       }
+      var matched = (p.variants || []).find(function (v) {
+        return v.id === sel.variantId;
+      });
+      if (matched && (Number(matched.quantity) || 0) <= 0) {
+        alert("این ترکیب فعلاً موجود نیست.");
+        return;
+      }
+      if (matched && qty > Number(matched.quantity)) {
+        alert("موجودی کافی نیست. حداکثر " + matched.quantity + " عدد.");
+        return;
+      }
       addToCart(p, sel, qty);
     });
 
-    $(document).on("click", ".js-color", function () {
-      $(this).closest(".color-swatches, .pdp-swatches").find(".js-color").removeClass("is-active");
-      $(this).addClass("is-active");
+    $(document).on("click", ".js-color", function (e) {
+      var $btn = $(this);
+      if ($btn.hasClass("is-oos") || $btn.prop("disabled")) {
+        e.preventDefault();
+        return false;
+      }
+      $btn.closest(".color-swatches, .pdp-swatches").find(".js-color").removeClass("is-active");
+      $btn.addClass("is-active");
     });
 
     $(document).on("click", ".js-wishlist", function () {
@@ -1298,9 +1345,14 @@
       }
     });
 
-    $(document).on("click", ".js-attr", function () {
-      $(this).closest(".pdp-attr-swatches, .pdp-swatches").find(".js-attr").removeClass("is-active");
-      $(this).addClass("is-active");
+    $(document).on("click", ".js-attr", function (e) {
+      var $btn = $(this);
+      if ($btn.hasClass("is-oos") || $btn.prop("disabled")) {
+        e.preventDefault();
+        return false;
+      }
+      $btn.closest(".pdp-attr-swatches, .pdp-swatches").find(".js-attr").removeClass("is-active");
+      $btn.addClass("is-active");
     });
 
     $(document).on("click", ".js-qty-dec", function () {
