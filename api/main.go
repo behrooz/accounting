@@ -135,7 +135,13 @@ func main() {
 
 	// ── Storefront public (no JWT) — catalog + checkout + phone-based addresses ──
 	api.GET("/products", func(c *gin.Context) {
-		ps, err := repo.ListProducts(database)
+		filter := repo.ProductListFilter{
+			Sort:         c.Query("sort"),
+			CategoryID:   c.Query("categoryId"),
+			CategorySlug: c.Query("cat"),
+			Query:        c.Query("q"),
+		}
+		ps, err := repo.ListProducts(database, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
 			return
@@ -626,7 +632,7 @@ func main() {
 
 	// Reports (dashboard + profit-loss derived from products + invoices)
 	authed.GET("/dashboard", func(c *gin.Context) {
-		ps, err := repo.ListProducts(database)
+		ps, err := repo.ListProducts(database, repo.ProductListFilter{})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
 			return
@@ -677,7 +683,7 @@ func main() {
 	})
 
 	authed.GET("/reports/profit-loss", func(c *gin.Context) {
-		ps, err := repo.ListProducts(database)
+		ps, err := repo.ListProducts(database, repo.ProductListFilter{})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
 			return

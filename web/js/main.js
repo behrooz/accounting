@@ -295,6 +295,12 @@
     var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
     var $home = $("#homeProducts");
     var onProductPage = $("#productPage").length > 0;
+    var onShopPage = $("#shopProducts").length > 0;
+
+    if (onShopPage) {
+      return loadShopProducts();
+    }
+
     if ($home.length) {
       $home.html('<p class="cat-loading">در حال بارگذاری محصولات...</p>');
     }
@@ -311,7 +317,6 @@
         var list = (Array.isArray(rows) ? rows : []).map(mapApiProduct);
         window.ABERANG_PRODUCTS = list;
         renderHome();
-        renderShop();
         if (!onProductPage) renderProductPage();
       })
       .fail(function () {
@@ -321,8 +326,69 @@
             '<p class="cat-loading">دریافت محصولات ناموفق بود. API را بررسی کنید.</p>'
           );
         }
-        renderShop();
         if (!onProductPage) renderProductPage();
+      });
+  }
+
+  function shopListParams() {
+    var sort = $("#sortFilter").val() || queryParam("sort") || "new";
+    if (window.location.hash === "#sale") sort = "sale";
+    return {
+      sort: sort,
+      categoryId: queryParam("categoryId") || "",
+      cat: queryParam("cat") || "",
+      q: (queryParam("q") || "").trim()
+    };
+  }
+
+  function loadShopProducts() {
+    var $grid = $("#shopProducts");
+    if (!$grid.length) return;
+
+    var params = shopListParams();
+    if ($("#sortFilter").length) {
+      $("#sortFilter").val(params.sort);
+    }
+
+    var q = params.q;
+    if (q) {
+      $("#shopSearchInput").val(q);
+      $("#shopTitle").text("نتایج «" + q + "»");
+    } else if (params.sort === "sale" || window.location.hash === "#sale") {
+      $("#shopTitle").text("فروش ویژه");
+    } else if (params.categoryId && Array.isArray(window.ABERANG_CATEGORIES)) {
+      var match = window.ABERANG_CATEGORIES.find(function (c) {
+        return String(c.id) === String(params.categoryId);
+      });
+      $("#shopTitle").text(match ? match.name : "فروشگاه");
+    } else {
+      $("#shopTitle").text("فروشگاه");
+    }
+
+    $grid.html('<p class="cat-loading">در حال بارگذاری محصولات...</p>');
+    $("#shopEmpty").prop("hidden", true);
+
+    var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
+    var data = { sort: params.sort || "new" };
+    if (params.categoryId) data.categoryId = params.categoryId;
+    if (params.cat && params.cat !== "all") data.cat = params.cat;
+    if (params.q) data.q = params.q;
+
+    return $.ajax({
+      url: base + "/products",
+      method: "GET",
+      data: data,
+      dataType: "json"
+    })
+      .done(function (rows) {
+        var list = (Array.isArray(rows) ? rows : []).map(mapApiProduct);
+        window.ABERANG_PRODUCTS = list;
+        renderShop();
+      })
+      .fail(function () {
+        window.ABERANG_PRODUCTS = [];
+        $grid.empty();
+        $("#shopEmpty").prop("hidden", false).text("دریافت محصولات ناموفق بود.");
       });
   }
 
@@ -432,52 +498,6 @@
     return params.get(name);
   }
 
-  function filterProducts(list) {
-    var cat = $("#catFilter").val() || queryParam("cat") || "all";
-    var categoryId = queryParam("categoryId");
-    var sort = $("#sortFilter").val() || "new";
-    var q = (queryParam("q") || "").trim();
-    var hashSale = window.location.hash === "#sale";
-
-    var out = list.slice();
-
-    if (categoryId) {
-      out = out.filter(function (p) {
-        return String(p.categoryId || "") === String(categoryId);
-      });
-    } else if (cat && cat !== "all") {
-      out = out.filter(function (p) {
-        return p.category === cat || p.categorySlug === cat;
-      });
-    }
-
-    if (q) {
-      out = out.filter(function (p) {
-        return p.name.indexOf(q) !== -1;
-      });
-      $("#shopTitle").text('نتایج «' + q + '»');
-    }
-
-    if (hashSale || sort === "sale") {
-      out = out.filter(function (p) {
-        return !!p.salePrice;
-      });
-      if (hashSale) $("#shopTitle").text("فروش ویژه");
-    }
-
-    if (sort === "price-asc") {
-      out.sort(function (a, b) {
-        return (a.salePrice || a.price) - (b.salePrice || b.price);
-      });
-    } else if (sort === "price-desc") {
-      out.sort(function (a, b) {
-        return (b.salePrice || b.price) - (a.salePrice || a.price);
-      });
-    }
-
-    return out;
-  }
-
   function renderHome() {
     var $grid = $("#homeProducts");
     if (!$grid.length) return;
@@ -500,27 +520,12 @@
     var $grid = $("#shopProducts");
     if (!$grid.length) return;
 
-    var cat = queryParam("cat");
-    if (cat && $("#catFilter option[value='" + cat + "']").length) {
-      $("#catFilter").val(cat);
-    }
-
-    var q = queryParam("q");
-    if (q) $("#shopSearchInput").val(q);
-
-    var categoryId = queryParam("categoryId");
-    if (categoryId && Array.isArray(window.ABERANG_CATEGORIES)) {
-      var match = window.ABERANG_CATEGORIES.find(function (c) {
-        return String(c.id) === String(categoryId);
-      });
-      if (match) $("#shopTitle").text(match.name);
-    } else if (cat && !q) {
-      $("#shopTitle").text("فروشگاه");
-    }
-
-    var list = filterProducts(getProducts());
+    var list = getProducts();
     $grid.html(list.map(productCard).join(""));
     $("#shopEmpty").prop("hidden", list.length > 0);
+    if (list.length === 0) {
+      $("#shopEmpty").text("محصولی پیدا نشد.");
+    }
   }
 
   function uniqueImages(list) {
@@ -1424,6 +1429,18 @@
       $(this).val(n);
     });
 
-    $("#catFilter, #sortFilter").on("change", renderShop);
+    $("#sortFilter").on("change", function () {
+      var sort = $(this).val() || "new";
+      var url = new URL(window.location.href);
+      if (sort && sort !== "new") url.searchParams.set("sort", sort);
+      else url.searchParams.delete("sort");
+      if (sort === "sale") {
+        url.hash = "sale";
+      } else if (url.hash === "#sale") {
+        url.hash = "";
+      }
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
+      loadShopProducts();
+    });
   });
 })(jQuery);

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"accounting-api/internal/media"
@@ -51,9 +52,49 @@ type varRow struct {
 	UpdatedAt       string         `db:"updated_at"`
 }
 
-func ListProducts(db *sqlx.DB) ([]models.Product, error) {
+type ProductListFilter struct {
+	Sort         string // new | price-asc | price-desc | sale
+	CategoryID   string
+	CategorySlug string
+	Query        string
+}
+
+func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
+	q := `
+		SELECT p.id, p.name, p.category_id
+		FROM products p
+		LEFT JOIN product_categories c ON c.id = p.category_id
+		WHERE 1=1`
+	args := make([]any, 0, 4)
+
+	if id := strings.TrimSpace(f.CategoryID); id != "" {
+		q += " AND p.category_id = ?"
+		args = append(args, id)
+	} else if slug := strings.TrimSpace(f.CategorySlug); slug != "" && slug != "all" {
+		q += " AND c.slug = ?"
+		args = append(args, slug)
+	}
+	if query := strings.TrimSpace(f.Query); query != "" {
+		q += " AND p.name LIKE ?"
+		args = append(args, "%"+query+"%")
+	}
+
+	sortKey := strings.TrimSpace(strings.ToLower(f.Sort))
+	if sortKey == "" {
+		sortKey = "new"
+	}
+	if sortKey == "sale" {
+		q += ` AND EXISTS (
+			SELECT 1 FROM product_variants v
+			WHERE v.product_id = p.id AND v.sale_price > 0
+		)`
+	}
+
+	// ID order for "new"; price sorts applied after loading full products.
+	q += " ORDER BY p.updated_at DESC"
+
 	var ps []productRow
-	if err := db.Select(&ps, "SELECT id, name, category_id FROM products ORDER BY updated_at DESC"); err != nil {
+	if err := db.Select(&ps, q, args...); err != nil {
 		return nil, err
 	}
 	out := make([]models.Product, 0, len(ps))
@@ -64,7 +105,40 @@ func ListProducts(db *sqlx.DB) ([]models.Product, error) {
 		}
 		out = append(out, *full)
 	}
+
+	switch sortKey {
+	case "price-asc":
+		sort.SliceStable(out, func(i, j int) bool {
+			return productListPrice(out[i]) < productListPrice(out[j])
+		})
+	case "price-desc":
+		sort.SliceStable(out, func(i, j int) bool {
+			return productListPrice(out[i]) > productListPrice(out[j])
+		})
+	case "sale":
+		sort.SliceStable(out, func(i, j int) bool {
+			return productListPrice(out[i]) < productListPrice(out[j])
+		})
+	}
+
 	return out, nil
+}
+
+func productListPrice(p models.Product) int64 {
+	var min int64
+	for _, v := range p.Variants {
+		price := v.SalePrice
+		if price <= 0 {
+			price = v.Price
+		}
+		if price <= 0 {
+			continue
+		}
+		if min == 0 || price < min {
+			min = price
+		}
+	}
+	return min
 }
 
 type imgRow struct {
