@@ -29,6 +29,14 @@
     return status === "confirmed" ? "تأیید‌شده" : "پیش‌نویس";
   }
 
+  function apiError(xhr, fallback) {
+    try {
+      return (xhr.responseJSON && xhr.responseJSON.error) || fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
   function showGuestView() {
     $("#accountGuest").prop("hidden", false);
     $("#accountLoggedIn").prop("hidden", true);
@@ -108,12 +116,10 @@
             '">' +
             "<strong>" +
             (addr.title || "آدرس") +
-            (addr.isDefault ? ' <em>پیش‌فرض</em>' : "") +
+            (addr.isDefault ? " <em>پیش‌فرض</em>" : "") +
             "</strong>" +
             (addr.fullName ? "<p>" + addr.fullName + "</p>" : "") +
-            (addr.phone
-              ? '<p dir="ltr">' + addr.phone + "</p>"
-              : "") +
+            (addr.phone ? '<p dir="ltr">' + addr.phone + "</p>" : "") +
             "<p>" +
             line +
             (addr.postalCode ? " · کدپستی " + addr.postalCode : "") +
@@ -174,8 +180,36 @@
     loadAccountDashboard(customer.phone);
   }
 
+  function sendCode(opts) {
+    return $.ajax({
+      url: AberangAuth.apiBase() + "/store/auth/send-code",
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({ phone: opts.phone, mode: opts.mode }),
+      dataType: "json"
+    });
+  }
+
+  function verifyCode(opts) {
+    return $.ajax({
+      url: AberangAuth.apiBase() + "/store/auth/verify-code",
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({
+        phone: opts.phone,
+        code: opts.code,
+        mode: opts.mode,
+        name: opts.name || ""
+      }),
+      dataType: "json"
+    });
+  }
+
   function initAccountPage() {
     if (!$("body").hasClass("page-account")) return;
+
+    var loginState = { phone: "", mode: "login" };
+    var registerState = { phone: "", mode: "register", name: "" };
 
     var session = AberangAuth.getSession();
     if (session && session.phone) {
@@ -190,74 +224,190 @@
       $("#loginPhone, #registerPhone").val(lastPhone);
     }
 
-    $("#loginForm").on("submit", function (e) {
+    function showLoginCodeStep(msg) {
+      $("#loginPhoneForm").prop("hidden", true);
+      $("#loginCodeForm").prop("hidden", false);
+      $("#loginError").prop("hidden", true);
+      $("#loginOk").text(msg || "کد تأیید ارسال شد.").prop("hidden", false);
+      $("#loginCode").val("").trigger("focus");
+    }
+
+    function showLoginPhoneStep() {
+      $("#loginPhoneForm").prop("hidden", false);
+      $("#loginCodeForm").prop("hidden", true);
+      $("#loginOk, #loginError, #loginCodeError").prop("hidden", true);
+    }
+
+    function showRegisterCodeStep(msg) {
+      $("#registerPhoneForm").prop("hidden", true);
+      $("#registerCodeForm").prop("hidden", false);
+      $("#registerError").prop("hidden", true);
+      $("#registerOk").text(msg || "کد تأیید ارسال شد.").prop("hidden", false);
+      $("#registerCode").val("").trigger("focus");
+    }
+
+    function showRegisterPhoneStep() {
+      $("#registerPhoneForm").prop("hidden", false);
+      $("#registerCodeForm").prop("hidden", true);
+      $("#registerOk, #registerError, #registerCodeError").prop("hidden", true);
+    }
+
+    $("#loginPhoneForm").on("submit", function (e) {
       e.preventDefault();
       var phone = normalizePhone($("#loginPhone").val());
       var $err = $("#loginError");
+      var $ok = $("#loginOk");
+      $ok.prop("hidden", true);
       if (!isValidPhone(phone)) {
         $err.text("شماره موبایل معتبر نیست (مثال: 09123456789).").prop("hidden", false);
         return;
       }
       $err.prop("hidden", true);
-      var $btn = $("#loginSubmit");
-      $btn.prop("disabled", true).text("در حال بررسی...");
-      $.ajax({
-        url: AberangAuth.apiBase() + "/store/customer",
-        method: "GET",
-        data: { phone: phone },
-        dataType: "json"
-      })
-        .done(function (customer) {
-          finishLogin(customer);
+      var $btn = $("#loginSendBtn");
+      $btn.prop("disabled", true).text("در حال ارسال...");
+      sendCode({ phone: phone, mode: "login" })
+        .done(function (res) {
+          loginState.phone = res.phone || phone;
+          var msg = "کد تأیید به " + loginState.phone + " ارسال شد.";
+          if (res.debugCode) msg += " (کد آزمایشی: " + res.debugCode + ")";
+          showLoginCodeStep(msg);
         })
         .fail(function (xhr) {
-          if (xhr.status === 404) {
-            $err.text("این شماره ثبت نشده است. از بخش عضویت استفاده کنید.").prop("hidden", false);
-          } else {
-            $err.text("خطا در ورود. دوباره تلاش کنید.").prop("hidden", false);
-          }
+          $err.text(apiError(xhr, "ارسال کد ناموفق بود.")).prop("hidden", false);
         })
         .always(function () {
-          $btn.prop("disabled", false).text("ورود با رمز عبور یکبار مصرف");
+          $btn.prop("disabled", false).text("ارسال کد تأیید");
         });
     });
 
-    $("#registerForm").on("submit", function (e) {
+    $("#loginCodeForm").on("submit", function (e) {
+      e.preventDefault();
+      var code = String($("#loginCode").val() || "").trim();
+      var $err = $("#loginCodeError");
+      if (!/^\d{4,8}$/.test(code)) {
+        $err.text("کد تأیید را درست وارد کنید.").prop("hidden", false);
+        return;
+      }
+      $err.prop("hidden", true);
+      var $btn = $("#loginVerifyBtn");
+      $btn.prop("disabled", true).text("در حال بررسی...");
+      verifyCode({ phone: loginState.phone, code: code, mode: "login" })
+        .done(function (customer) {
+          finishLogin(customer);
+        })
+        .fail(function (xhr) {
+          $err.text(apiError(xhr, "کد نادرست است.")).prop("hidden", false);
+        })
+        .always(function () {
+          $btn.prop("disabled", false).text("تأیید و ورود");
+        });
+    });
+
+    $("#loginResendBtn").on("click", function () {
+      if (!loginState.phone) return;
+      var $btn = $(this);
+      $btn.prop("disabled", true).text("در حال ارسال...");
+      sendCode({ phone: loginState.phone, mode: "login" })
+        .done(function (res) {
+          var msg = "کد جدید ارسال شد.";
+          if (res.debugCode) msg += " (کد آزمایشی: " + res.debugCode + ")";
+          $("#loginOk").text(msg).prop("hidden", false);
+          $("#loginCodeError").prop("hidden", true);
+        })
+        .fail(function (xhr) {
+          $("#loginCodeError").text(apiError(xhr, "ارسال مجدد ناموفق بود.")).prop("hidden", false);
+        })
+        .always(function () {
+          $btn.prop("disabled", false).text("ارسال مجدد کد");
+        });
+    });
+
+    $("#loginChangePhoneBtn").on("click", showLoginPhoneStep);
+
+    $("#registerPhoneForm").on("submit", function (e) {
       e.preventDefault();
       var phone = normalizePhone($("#registerPhone").val());
+      var name = String($("#registerName").val() || "").trim();
       var $err = $("#registerError");
+      var $ok = $("#registerOk");
+      $ok.prop("hidden", true);
       if (!isValidPhone(phone)) {
         $err.text("شماره موبایل معتبر نیست (مثال: 09123456789).").prop("hidden", false);
         return;
       }
       $err.prop("hidden", true);
-      var $btn = $("#registerSubmit");
-      $btn.prop("disabled", true).text("در حال ثبت...");
-      $.ajax({
-        url: AberangAuth.apiBase() + "/store/register",
-        method: "POST",
-        contentType: "application/json",
-        data: JSON.stringify({ phone: phone }),
-        dataType: "json"
+      var $btn = $("#registerSendBtn");
+      $btn.prop("disabled", true).text("در حال ارسال...");
+      sendCode({ phone: phone, mode: "register" })
+        .done(function (res) {
+          registerState.phone = res.phone || phone;
+          registerState.name = name;
+          var msg = "کد تأیید به " + registerState.phone + " ارسال شد.";
+          if (res.debugCode) msg += " (کد آزمایشی: " + res.debugCode + ")";
+          showRegisterCodeStep(msg);
+        })
+        .fail(function (xhr) {
+          $err.text(apiError(xhr, "ارسال کد ناموفق بود.")).prop("hidden", false);
+        })
+        .always(function () {
+          $btn.prop("disabled", false).text("ارسال کد تأیید");
+        });
+    });
+
+    $("#registerCodeForm").on("submit", function (e) {
+      e.preventDefault();
+      var code = String($("#registerCode").val() || "").trim();
+      var $err = $("#registerCodeError");
+      if (!/^\d{4,8}$/.test(code)) {
+        $err.text("کد تأیید را درست وارد کنید.").prop("hidden", false);
+        return;
+      }
+      $err.prop("hidden", true);
+      var $btn = $("#registerVerifyBtn");
+      $btn.prop("disabled", true).text("در حال بررسی...");
+      verifyCode({
+        phone: registerState.phone,
+        code: code,
+        mode: "register",
+        name: registerState.name
       })
         .done(function (customer) {
           finishLogin(customer);
         })
         .fail(function (xhr) {
-          var msg = "ثبت‌نام ناموفق بود.";
-          try {
-            msg = (xhr.responseJSON && xhr.responseJSON.error) || msg;
-          } catch (err) {}
-          $err.text(msg).prop("hidden", false);
+          $err.text(apiError(xhr, "کد نادرست است.")).prop("hidden", false);
         })
         .always(function () {
-          $btn.prop("disabled", false).text("عضویت");
+          $btn.prop("disabled", false).text("تأیید و عضویت");
         });
     });
+
+    $("#registerResendBtn").on("click", function () {
+      if (!registerState.phone) return;
+      var $btn = $(this);
+      $btn.prop("disabled", true).text("در حال ارسال...");
+      sendCode({ phone: registerState.phone, mode: "register" })
+        .done(function (res) {
+          var msg = "کد جدید ارسال شد.";
+          if (res.debugCode) msg += " (کد آزمایشی: " + res.debugCode + ")";
+          $("#registerOk").text(msg).prop("hidden", false);
+          $("#registerCodeError").prop("hidden", true);
+        })
+        .fail(function (xhr) {
+          $("#registerCodeError").text(apiError(xhr, "ارسال مجدد ناموفق بود.")).prop("hidden", false);
+        })
+        .always(function () {
+          $btn.prop("disabled", false).text("ارسال مجدد کد");
+        });
+    });
+
+    $("#registerChangePhoneBtn").on("click", showRegisterPhoneStep);
 
     $("#logoutBtn").on("click", function () {
       AberangAuth.clearSession();
       showGuestView();
+      showLoginPhoneStep();
+      showRegisterPhoneStep();
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   }

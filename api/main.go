@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"accounting-api/internal/auth"
 	"accounting-api/internal/config"
@@ -16,6 +18,7 @@ import (
 	"accounting-api/internal/migrate"
 	"accounting-api/internal/models"
 	"accounting-api/internal/repo"
+	"accounting-api/internal/smsir"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -52,6 +55,13 @@ func main() {
 	}
 	if err := repo.EnsureShopSettings(database); err != nil {
 		panic(err)
+	}
+	_ = repo.EnsureStoreOTPTable(database)
+
+	smsClient := &smsir.Client{
+		APIKey:     cfg.SMSIRAPIKey,
+		TemplateID: cfg.SMSIRTemplateID,
+		ParamName:  cfg.SMSIRParamName,
 	}
 
 	// seed default admin (admin / 123456)
@@ -231,6 +241,147 @@ func main() {
 		cust.Addresses = addrs
 		c.JSON(http.StatusOK, cust)
 	})
+
+	// Storefront OTP auth via sms.ir (passwordless)
+	api.POST("/store/auth/send-code", func(c *gin.Context) {
+		var body struct {
+			Phone string `json:"phone"`
+			Mode  string `json:"mode"` // login | register | any (default)
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		phone, err := repo.NormalizeIranPhone(body.Phone)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		mode := strings.ToLower(strings.TrimSpace(body.Mode))
+		if mode == "" {
+			mode = "any"
+		}
+		existing, findErr := repo.FindCustomerByPhone(database, phone)
+		switch mode {
+		case "login":
+			if findErr != nil || existing == nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "این شماره ثبت نشده است. از بخش عضویت استفاده کنید."})
+				return
+			}
+		case "register":
+			if findErr == nil && existing != nil {
+				c.JSON(http.StatusConflict, gin.H{"error": "این شماره قبلاً ثبت شده است. وارد شوید."})
+				return
+			}
+		}
+
+		code, err := repo.GenerateOTPCode(5)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		if err := repo.SaveStoreOTP(database, phone, code, 5*time.Minute); err != nil {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+			return
+		}
+
+		resp := gin.H{
+			"ok":      true,
+			"phone":   phone,
+			"expires": 300,
+		}
+		if smsClient.Enabled() {
+			if err := smsClient.SendVerify(phone, code); err != nil {
+				c.JSON(http.StatusBadGateway, gin.H{"error": "ارسال پیامک ناموفق بود: " + err.Error()})
+				return
+			}
+		} else {
+			// Dev / unconfigured: log code and expose only in non-prod
+			log.Printf("[store-otp] phone=%s code=%s (sms.ir not configured)", phone, code)
+			if cfg.Env != "prod" {
+				resp["debugCode"] = code
+			}
+		}
+		c.JSON(http.StatusOK, resp)
+	})
+
+	api.POST("/store/auth/verify-code", func(c *gin.Context) {
+		var body struct {
+			Phone string `json:"phone"`
+			Code  string `json:"code"`
+			Mode  string `json:"mode"`
+			Name  string `json:"name"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		phone, err := repo.NormalizeIranPhone(body.Phone)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := repo.VerifyStoreOTP(database, phone, body.Code); err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
+
+		mode := strings.ToLower(strings.TrimSpace(body.Mode))
+		if mode == "" {
+			mode = "any"
+		}
+		name := strings.TrimSpace(body.Name)
+		if name == "" {
+			name = "کاربر"
+		}
+
+		existing, findErr := repo.FindCustomerByPhone(database, phone)
+		switch mode {
+		case "login":
+			if findErr != nil || existing == nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "این شماره ثبت نشده است."})
+				return
+			}
+		case "register":
+			if findErr == nil && existing != nil {
+				// Already registered — treat as login after successful OTP
+				addrs, _ := repo.ListAddresses(database, existing.ID)
+				existing.Addresses = addrs
+				c.JSON(http.StatusOK, existing)
+				return
+			}
+			cust, err := repo.EnsureCustomerByPhone(database, name, phone, "عضویت فروشگاه آنلاین")
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			addrs, _ := repo.ListAddresses(database, cust.ID)
+			cust.Addresses = addrs
+			c.JSON(http.StatusOK, cust)
+			return
+		default:
+			if findErr != nil || existing == nil {
+				cust, err := repo.EnsureCustomerByPhone(database, name, phone, "عضویت فروشگاه آنلاین")
+				if err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+					return
+				}
+				addrs, _ := repo.ListAddresses(database, cust.ID)
+				cust.Addresses = addrs
+				c.JSON(http.StatusOK, cust)
+				return
+			}
+			addrs, _ := repo.ListAddresses(database, existing.ID)
+			existing.Addresses = addrs
+			c.JSON(http.StatusOK, existing)
+			return
+		}
+
+		addrs, _ := repo.ListAddresses(database, existing.ID)
+		existing.Addresses = addrs
+		c.JSON(http.StatusOK, existing)
+	})
+
 	api.POST("/store/addresses", func(c *gin.Context) {
 		var body struct {
 			Phone   string                 `json:"phone"`

@@ -6,7 +6,7 @@
   <title>حساب کاربری | آبرنگ</title>
   <meta name="description" content="ورود و عضویت در فروشگاه آبرنگ" />
   <link href="https://fonts.cdnfonts.com/css/iranyekan" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=21" />
+  <link rel="stylesheet" href="css/style.css?v=22" />
 </head>
 <body class="page-account">
   <div class="top-banner" id="topBanner">
@@ -77,25 +77,57 @@
     <div id="accountGuest" class="account-forms">
       <section class="account-card">
         <h2>ورود</h2>
-        <form id="loginForm" class="account-form">
+        <p class="account-hint">شماره موبایل را وارد کنید تا کد تأیید پیامک شود. نیازی به رمز عبور نیست.</p>
+        <form id="loginPhoneForm" class="account-form">
           <label class="field required">
             <span>شماره موبایل</span>
             <input id="loginPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="09xxxxxxxxx" required />
           </label>
           <p class="account-error" id="loginError" hidden></p>
-          <button type="submit" class="btn-account" id="loginSubmit">ورود با رمز عبور یکبار مصرف</button>
+          <p class="account-ok" id="loginOk" hidden></p>
+          <button type="submit" class="btn-account" id="loginSendBtn">ارسال کد تأیید</button>
+        </form>
+        <form id="loginCodeForm" class="account-form" hidden>
+          <label class="field required">
+            <span>کد تأیید</span>
+            <input id="loginCode" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="کد ۵ رقمی" maxlength="8" required />
+          </label>
+          <p class="account-error" id="loginCodeError" hidden></p>
+          <button type="submit" class="btn-account" id="loginVerifyBtn">تأیید و ورود</button>
+          <div class="account-auth-actions">
+            <button type="button" class="btn-account btn-account-outline" id="loginResendBtn">ارسال مجدد کد</button>
+            <button type="button" class="btn-account btn-account-muted" id="loginChangePhoneBtn">تغییر شماره</button>
+          </div>
         </form>
       </section>
 
       <section class="account-card">
         <h2>عضویت</h2>
-        <form id="registerForm" class="account-form">
+        <p class="account-hint">با شماره موبایل عضو شوید؛ کد تأیید پیامک می‌شود.</p>
+        <form id="registerPhoneForm" class="account-form">
+          <label class="field">
+            <span>نام (اختیاری)</span>
+            <input id="registerName" name="name" type="text" autocomplete="name" placeholder="نام شما" />
+          </label>
           <label class="field required">
             <span>شماره موبایل</span>
             <input id="registerPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="09xxxxxxxxx" required />
           </label>
           <p class="account-error" id="registerError" hidden></p>
-          <button type="submit" class="btn-account" id="registerSubmit">عضویت</button>
+          <p class="account-ok" id="registerOk" hidden></p>
+          <button type="submit" class="btn-account" id="registerSendBtn">ارسال کد تأیید</button>
+        </form>
+        <form id="registerCodeForm" class="account-form" hidden>
+          <label class="field required">
+            <span>کد تأیید</span>
+            <input id="registerCode" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="کد ۵ رقمی" maxlength="8" required />
+          </label>
+          <p class="account-error" id="registerCodeError" hidden></p>
+          <button type="submit" class="btn-account" id="registerVerifyBtn">تأیید و عضویت</button>
+          <div class="account-auth-actions">
+            <button type="button" class="btn-account btn-account-outline" id="registerResendBtn">ارسال مجدد کد</button>
+            <button type="button" class="btn-account btn-account-muted" id="registerChangePhoneBtn">تغییر شماره</button>
+          </div>
         </form>
       </section>
     </div>
@@ -182,8 +214,8 @@
   <script src="js/runtime-config.js?v=12"></script>
   <script src="js/config.js?v=12"></script>
   <script src="js/data.js?v=12"></script>
-  <script src="js/auth.js?v=12"></script>
+  <script src="js/auth.js?v=22"></script>
   <script src="js/main.js?v=21"></script>
-  <script src="js/account.js?v=12"></script>
+  <script src="js/account.js?v=22"></script>
 </body>
 </html>

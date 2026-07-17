@@ -108,6 +108,12 @@ env:
     value: "root:secret123@tcp(mysql-headless:3306)/accounting?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci&multiStatements=true"
   - name: JWT_SECRET
     value: "change-me-in-production"
+  - name: SMS_IR_API_KEY
+    value: "44emchgoRtsYeH6JROqPjUnkmG5asQAL1hazazeJ51zQbRPq"
+  - name: SMS_IR_TEMPLATE_ID
+    value: "434229"
+  - name: SMS_IR_PARAM_NAME
+    value: "CODE"
   # Example: load from Secret instead of plain value
   # - name: MYSQL_DSN
   #   valueFrom:

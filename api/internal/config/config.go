@@ -3,6 +3,7 @@ package config
 import (
 	"bufio"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -13,17 +14,26 @@ type Config struct {
 
 	MySQLDSN  string
 	JWTSecret string
+
+	// sms.ir OTP (https://api.sms.ir/v1/send/verify)
+	SMSIRAPIKey     string
+	SMSIRTemplateID int
+	SMSIRParamName  string
 }
 
 func Load() Config {
 	_ = loadDotEnv(".env")
 
+	tmplID, _ := strconv.Atoi(getenv("SMS_IR_TEMPLATE_ID", "0"))
 	cfg := Config{
-		Env:        getenv("APP_ENV", "dev"),
-		Port:       getenv("APP_PORT", "8080"),
-		CorsOrigin: getenv("APP_CORS_ORIGIN", "*"),
-		MySQLDSN:   getenv("MYSQL_DSN", ""),
-		JWTSecret:  getenv("JWT_SECRET", "change-me"),
+		Env:             getenv("APP_ENV", "dev"),
+		Port:            getenv("APP_PORT", "8080"),
+		CorsOrigin:      getenv("APP_CORS_ORIGIN", "*"),
+		MySQLDSN:        getenv("MYSQL_DSN", ""),
+		JWTSecret:       getenv("JWT_SECRET", "change-me"),
+		SMSIRAPIKey:     getenv("SMS_IR_API_KEY", ""),
+		SMSIRTemplateID: tmplID,
+		SMSIRParamName:  getenv("SMS_IR_PARAM_NAME", "CODE"),
 	}
 	return cfg
 }
