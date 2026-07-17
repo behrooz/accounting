@@ -204,17 +204,17 @@ const OrderItemsDetail = ({ data }: ICellRendererParams<SalesRow>) => {
   const items = data.items ?? [];
   if (!items.length) {
     return (
-      <div className="flex h-full items-center bg-[#f2f8fd] px-4 text-sm text-[#545b64]">
+      <div className="flex h-full items-center bg-[#f2f8fd] px-6 py-4 text-sm text-[#545b64]">
         این فاکتور اقلامی ندارد.
       </div>
     );
   }
   return (
-    <div className="h-full border-y border-[#c9d7e3] bg-[#f2f8fd] px-3 py-2">
-      <div className="mb-1.5 text-xs font-semibold text-[#0073bb]">
+    <div className="box-border h-full border-y border-[#c9d7e3] bg-[#f2f8fd] px-6 pb-4 pt-3">
+      <div className="mb-2 text-xs font-semibold text-[#0073bb]">
         اقلام سفارش ({fa(items.length)})
       </div>
-      <div className="overflow-hidden rounded border border-[#c9d7e3] bg-white">
+      <div className="overflow-hidden rounded border border-[#c9d7e3] bg-white p-2">
         <AgGridReact<InvoiceItem>
           theme={gridTheme}
           rowData={items}
@@ -241,7 +241,6 @@ const COLUMN_DEFS: ColDef<SalesRow>[] = [
     sortable: false,
     filter: false,
     resizable: false,
-    pinned: "right",
     cellRenderer: ExpandCellRenderer,
   },
   {
@@ -468,8 +467,9 @@ export default function SalesPage() {
   const getRowHeight = useCallback((p: RowHeightParams<SalesRow>) => {
     if (p.data?.rowType !== "detail") return 40;
     const n = p.data.items?.length ?? 0;
-    if (n === 0) return 56;
-    return Math.min(320, 56 + 32 + n * 34);
+    if (n === 0) return 72;
+    // outer padding + title + inner padding + header + rows
+    return Math.min(360, 72 + 32 + n * 34);
   }, []);
 
   const gridRows = useMemo(
@@ -596,7 +596,6 @@ export default function SalesPage() {
           isFullWidthRow={isFullWidthRow}
           fullWidthCellRenderer={OrderItemsDetail}
           getRowHeight={getRowHeight}
-          embedFullWidthRows={true}
         />
       </div>
       <p className="text-xs text-[#879596]">
