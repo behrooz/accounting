@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>محصول | آبرنگ</title>
+  <title>حساب کاربری | آبرنگ</title>
+  <meta name="description" content="ورود و عضویت در فروشگاه آبرنگ" />
   <link href="https://fonts.cdnfonts.com/css/iranyekan" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css?v=11" />
 </head>
-<body class="page-product">
+<body class="page-account">
   <div class="top-banner" id="topBanner">
-    <span>رنگبندی واقعی · ارسال از تهران</span>
+    <span>کانال آبرنگ در پیام‌رسان بله ✅</span>
     <button type="button" class="top-banner-close" id="bannerClose" aria-label="بستن">×</button>
   </div>
 
@@ -27,7 +28,7 @@
       <a class="brand-logo" href="index.html">آبرنگ</a>
 
       <div class="header-side header-side-end">
-        <a class="icon-btn" href="account.html" aria-label="حساب کاربری">
+        <a class="icon-btn is-active" href="account.html" aria-label="حساب کاربری">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.8-3.2 4-4.8 7-4.8s5.2 1.6 7 4.8" stroke-linecap="round"/></svg>
         </a>
         <button class="icon-btn cart-btn" id="cartToggle" type="button" aria-label="سبد خرید">
@@ -55,7 +56,7 @@
           <span class="sale-dot" aria-hidden="true"></span>
         </a>
         <div class="menu-cats" id="menuCategories"></div>
-        <a class="menu-link has-icon" href="account.html">
+        <a class="menu-link has-icon is-active" href="account.html">
           <span>ورود / ثبت نام</span>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.8-3.2 4-4.8 7-4.8s5.2 1.6 7 4.8" stroke-linecap="round"/></svg>
         </a>
@@ -63,8 +64,53 @@
     </div>
   </aside>
 
-  <main class="product-page" id="productPage">
-    <p class="loading-msg">در حال بارگذاری...</p>
+  <main class="account-page">
+    <section class="account-hero">
+      <h1>حساب کاربری من</h1>
+      <p class="account-breadcrumb"><a href="index.html">خانه</a> / حساب کاربری من</p>
+    </section>
+
+    <section class="cat-grid account-cat-grid" id="catGrid" aria-label="دسته‌ها">
+      <p class="cat-loading">در حال بارگذاری دسته‌ها...</p>
+    </section>
+
+    <div id="accountGuest" class="account-forms">
+      <section class="account-card">
+        <h2>ورود</h2>
+        <form id="loginForm" class="account-form">
+          <label class="field required">
+            <span>شماره موبایل</span>
+            <input id="loginPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="09xxxxxxxxx" required />
+          </label>
+          <p class="account-error" id="loginError" hidden></p>
+          <button type="submit" class="btn-account" id="loginSubmit">ورود با رمز عبور یکبار مصرف</button>
+        </form>
+      </section>
+
+      <section class="account-card">
+        <h2>عضویت</h2>
+        <form id="registerForm" class="account-form">
+          <label class="field required">
+            <span>شماره موبایل</span>
+            <input id="registerPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="09xxxxxxxxx" required />
+          </label>
+          <p class="account-error" id="registerError" hidden></p>
+          <button type="submit" class="btn-account" id="registerSubmit">عضویت</button>
+        </form>
+      </section>
+    </div>
+
+    <div id="accountLoggedIn" class="account-logged-in" hidden>
+      <section class="account-card">
+        <h2>خوش آمدید</h2>
+        <p class="account-user-name" id="accountUserName"></p>
+        <p class="account-user-phone" id="accountUserPhone" dir="ltr"></p>
+        <div class="account-actions">
+          <a class="btn-account btn-account-outline" href="checkout.html">سفارش‌های من / تسویه</a>
+          <button type="button" class="btn-account btn-account-muted" id="logoutBtn">خروج</button>
+        </div>
+      </section>
+    </div>
   </main>
 
   <footer class="site-footer compact">
@@ -95,11 +141,38 @@
   </aside>
   <div class="overlay" id="overlay" hidden></div>
 
+  <nav class="bottom-nav" aria-label="منوی پایین">
+    <a href="shop.html" class="bottom-nav-item">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/><path d="M9 21h6" stroke-linecap="round"/><path d="M8 12h8" stroke-linecap="round"/></svg>
+      <span>فروشگاه</span>
+    </a>
+    <a href="index.html" class="bottom-nav-item">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 11l8-7 8 7"/><path d="M6 10.5V20h12v-9.5"/></svg>
+      <span>خانه</span>
+    </a>
+    <button type="button" class="bottom-nav-item" id="dockCart">
+      <span class="nav-icon-wrap">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 8h10l-1 12H8L7 8z"/><path d="M9 8a3 3 0 016 0" stroke-linecap="round"/><path d="M9 12h6M9 16h6" stroke-linecap="round"/></svg>
+        <span class="badge-count dock-badge" id="dockCartCount">0</span>
+      </span>
+      <span>سبد خرید</span>
+    </button>
+    <a href="account.html" class="bottom-nav-item is-active">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.8-3.2 4-4.8 7-4.8s5.2 1.6 7 4.8" stroke-linecap="round"/></svg>
+      <span>حساب من</span>
+    </a>
+    <button type="button" class="bottom-nav-item" id="dockMenu">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      <span>منو</span>
+    </button>
+  </nav>
+
   <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
   <script src="js/runtime-config.js?v=11"></script>
   <script src="js/config.js?v=11"></script>
   <script src="js/data.js?v=11"></script>
   <script src="js/auth.js?v=11"></script>
   <script src="js/main.js?v=11"></script>
+  <script src="js/account.js?v=11"></script>
 </body>
 </html>

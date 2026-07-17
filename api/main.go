@@ -178,6 +178,28 @@ func main() {
 		cust.Addresses = addrs
 		c.JSON(http.StatusOK, cust)
 	})
+	api.POST("/store/register", func(c *gin.Context) {
+		var body struct {
+			Phone string `json:"phone"`
+			Name  string `json:"name"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Phone) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "phone required"})
+			return
+		}
+		name := strings.TrimSpace(body.Name)
+		if name == "" {
+			name = "کاربر"
+		}
+		cust, err := repo.EnsureCustomerByPhone(database, name, body.Phone, "عضویت فروشگاه آنلاین")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		addrs, _ := repo.ListAddresses(database, cust.ID)
+		cust.Addresses = addrs
+		c.JSON(http.StatusOK, cust)
+	})
 	api.POST("/store/addresses", func(c *gin.Context) {
 		var body struct {
 			Phone   string                 `json:"phone"`

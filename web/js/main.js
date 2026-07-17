@@ -1118,6 +1118,9 @@
   }
 
   $(function () {
+    if (window.AberangAuth && typeof AberangAuth.wireAccountLinks === "function") {
+      AberangAuth.wireAccountLinks();
+    }
     renderCart();
     loadCategories();
     loadProducts();

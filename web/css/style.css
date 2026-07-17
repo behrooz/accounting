@@ -1652,3 +1652,129 @@ body.page-product {
     gap: 1.4rem 1rem;
   }
 }
+
+/* Account page */
+.page-account .account-hero {
+  background: #111;
+  color: #fff;
+  text-align: center;
+  padding: 2rem 1rem 2.25rem;
+}
+
+.page-account .account-hero h1 {
+  margin: 0 0 0.45rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.page-account .account-breadcrumb {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.page-account .account-breadcrumb a {
+  color: inherit;
+}
+
+.page-account .account-cat-grid {
+  margin-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.page-account .account-forms,
+.page-account .account-logged-in {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.25rem 0.85rem 2rem;
+}
+
+.page-account .account-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 1.25rem 1rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.page-account .account-card h2 {
+  margin: 0 0 1rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.page-account .account-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+}
+
+.page-account .account-form .field span {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.page-account .account-form .field.required span::after {
+  content: " *";
+  color: var(--red);
+}
+
+.page-account .account-form input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+  font-size: 1rem;
+}
+
+.page-account .account-error {
+  margin: 0 0 0.75rem;
+  color: var(--red);
+  font-size: 0.85rem;
+}
+
+.page-account .btn-account {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: #d96b73;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+}
+
+.page-account .btn-account:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.page-account .btn-account-outline {
+  display: block;
+  text-align: center;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.page-account .btn-account-muted {
+  background: #f3f3f3;
+  color: var(--ink);
+  margin-top: 0.65rem;
+}
+
+.page-account .account-user-name {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.page-account .account-user-phone {
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+
+.page-account .icon-btn.is-active {
+  color: var(--red);
+}
