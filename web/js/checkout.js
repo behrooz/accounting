@@ -163,6 +163,10 @@
   function initCheckoutPage() {
     if (!$("#checkoutPageForm").length) return;
 
+    if (window.AberangAuth && !AberangAuth.requireLogin("checkout.html")) {
+      return;
+    }
+
     fillProvinces();
     var items = getCart();
     if (!items.length) {
@@ -174,10 +178,15 @@
     $("#checkoutPageForm").prop("hidden", false);
     renderOrder(items);
 
-    var lastPhone = localStorage.getItem(PHONE_KEY) || "";
+    var session = window.AberangAuth ? AberangAuth.getSession() : null;
+    var lastPhone =
+      (session && session.phone) || localStorage.getItem(PHONE_KEY) || "";
     if (lastPhone) {
       $("#checkoutPageForm").find('[name="phone"]').val(lastPhone);
       loadCustomerByPhone(lastPhone);
+    }
+    if (session && session.name) {
+      $("#checkoutPageForm").find('[name="fullName"]').val(session.name);
     }
 
     $(document).on("change", 'input[name="shipping"]', function () {

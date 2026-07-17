@@ -8,11 +8,19 @@
   <link rel="stylesheet" href="css/style.css?v=21" />
 </head>
 <body class="page-checkout">
-  <div class="top-banner" id="topBanner">
-    <span>رنگبندی واقعی · ارسال از تهران</span>
-    <button type="button" class="top-banner-close" id="bannerClose" aria-label="بستن">×</button>
-  </div>
-
+  <script>
+    (function () {
+      try {
+        var token = localStorage.getItem("aberang-customer-token");
+        var session = localStorage.getItem("aberang-customer-session");
+        if (!token || !session) {
+          location.replace("account.html?next=" + encodeURIComponent("checkout.html"));
+        }
+      } catch (e) {
+        location.replace("account.html?next=" + encodeURIComponent("checkout.html"));
+      }
+    })();
+  </script>
   <header class="site-header" id="siteHeader">
     <div class="header-bar">
       <div class="header-side header-side-start">
@@ -182,7 +190,8 @@
   <script src="js/runtime-config.js?v=10"></script>
   <script src="js/config.js?v=10"></script>
   <script src="js/data.js?v=10"></script>
-  <script src="js/main.js?v=21"></script>
-  <script src="js/checkout.js?v=10"></script>
+  <script src="js/auth.js?v=23"></script>
+  <script src="js/main.js?v=23"></script>
+  <script src="js/checkout.js?v=23"></script>
 </body>
 </html>

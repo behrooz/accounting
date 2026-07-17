@@ -15,6 +15,13 @@ type Claims struct {
 }
 
 func Sign(secret string, userID string, username string, role string) (string, error) {
+	return SignTTL(secret, userID, username, role, 24*time.Hour)
+}
+
+func SignTTL(secret string, userID string, username string, role string, ttl time.Duration) (string, error) {
+	if ttl <= 0 {
+		ttl = 24 * time.Hour
+	}
 	now := time.Now()
 	claims := Claims{
 		UserID:   userID,
@@ -22,7 +29,7 @@ func Sign(secret string, userID string, username string, role string) (string, e
 		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
 		},
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

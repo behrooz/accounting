@@ -305,6 +305,15 @@ func main() {
 		c.JSON(http.StatusOK, resp)
 	})
 
+	respondStoreCustomer := func(c *gin.Context, cust *models.Customer) {
+		token, err := auth.SignTTL(cfg.JWTSecret, cust.ID, cust.Phone, "customer", 7*24*time.Hour)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "token error"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"token": token, "customer": cust})
+	}
+
 	api.POST("/store/auth/verify-code", func(c *gin.Context) {
 		var body struct {
 			Phone string `json:"phone"`
@@ -347,7 +356,7 @@ func main() {
 				// Already registered — treat as login after successful OTP
 				addrs, _ := repo.ListAddresses(database, existing.ID)
 				existing.Addresses = addrs
-				c.JSON(http.StatusOK, existing)
+				respondStoreCustomer(c, existing)
 				return
 			}
 			cust, err := repo.EnsureCustomerByPhone(database, name, phone, "عضویت فروشگاه آنلاین")
@@ -357,7 +366,7 @@ func main() {
 			}
 			addrs, _ := repo.ListAddresses(database, cust.ID)
 			cust.Addresses = addrs
-			c.JSON(http.StatusOK, cust)
+			respondStoreCustomer(c, cust)
 			return
 		default:
 			if findErr != nil || existing == nil {
@@ -368,18 +377,18 @@ func main() {
 				}
 				addrs, _ := repo.ListAddresses(database, cust.ID)
 				cust.Addresses = addrs
-				c.JSON(http.StatusOK, cust)
+				respondStoreCustomer(c, cust)
 				return
 			}
 			addrs, _ := repo.ListAddresses(database, existing.ID)
 			existing.Addresses = addrs
-			c.JSON(http.StatusOK, existing)
+			respondStoreCustomer(c, existing)
 			return
 		}
 
 		addrs, _ := repo.ListAddresses(database, existing.ID)
 		existing.Addresses = addrs
-		c.JSON(http.StatusOK, existing)
+		respondStoreCustomer(c, existing)
 	})
 
 	api.POST("/store/addresses", func(c *gin.Context) {

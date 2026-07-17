@@ -171,13 +171,34 @@
       });
   }
 
-  function finishLogin(customer) {
-    AberangAuth.setSession({
-      id: customer.id || "",
-      phone: customer.phone || "",
-      name: customer.name || ""
-    });
+  function finishLogin(payload) {
+    var customer = payload && payload.customer ? payload.customer : payload;
+    var token = payload && payload.token ? payload.token : "";
+    if (!token || !customer || !customer.phone) {
+      alert("ورود ناموفق بود. دوباره تلاش کنید.");
+      return;
+    }
+    AberangAuth.setSession(
+      {
+        id: customer.id || "",
+        phone: customer.phone || "",
+        name: customer.name || ""
+      },
+      token
+    );
+    if (redirectAfterAuth()) return;
     loadAccountDashboard(customer.phone);
+  }
+
+  function redirectAfterAuth() {
+    try {
+      var next = new URLSearchParams(window.location.search).get("next") || "";
+      if (next === "checkout.html") {
+        window.location.href = "checkout.html";
+        return true;
+      }
+    } catch (e) {}
+    return false;
   }
 
   function sendCode(opts) {
@@ -211,12 +232,20 @@
     var loginState = { phone: "", mode: "login" };
     var registerState = { phone: "", mode: "register", name: "" };
 
-    var session = AberangAuth.getSession();
-    if (session && session.phone) {
+    if (AberangAuth.isLoggedIn()) {
+      if (redirectAfterAuth()) return;
+      var session = AberangAuth.getSession();
       showLoggedInView(session);
       loadAccountDashboard(session.phone);
     } else {
       showGuestView();
+      try {
+        if (new URLSearchParams(window.location.search).get("next") === "checkout.html") {
+          $("#loginOk")
+            .text("برای تکمیل سفارش ابتدا وارد شوید.")
+            .prop("hidden", false);
+        }
+      } catch (e) {}
     }
 
     var lastPhone = localStorage.getItem(AberangAuth.PHONE_KEY) || "";
@@ -292,8 +321,8 @@
       var $btn = $("#loginVerifyBtn");
       $btn.prop("disabled", true).text("در حال بررسی...");
       verifyCode({ phone: loginState.phone, code: code, mode: "login" })
-        .done(function (customer) {
-          finishLogin(customer);
+        .done(function (res) {
+          finishLogin(res);
         })
         .fail(function (xhr) {
           $err.text(apiError(xhr, "کد نادرست است.")).prop("hidden", false);
@@ -371,8 +400,8 @@
         mode: "register",
         name: registerState.name
       })
-        .done(function (customer) {
-          finishLogin(customer);
+        .done(function (res) {
+          finishLogin(res);
         })
         .fail(function (xhr) {
           $err.text(apiError(xhr, "کد نادرست است.")).prop("hidden", false);

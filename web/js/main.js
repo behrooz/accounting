@@ -793,6 +793,10 @@
       );
       return;
     }
+    if (window.AberangAuth && !AberangAuth.isLoggedIn()) {
+      window.location.href = AberangAuth.loginUrl("checkout.html");
+      return;
+    }
     window.location.href = "checkout.html";
   }
 
