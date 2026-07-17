@@ -127,6 +127,7 @@ func GetProduct(db *sqlx.DB, id string) (*models.Product, error) {
 	for _, v := range variantsRows {
 		m := map[string]string{}
 		_ = json.Unmarshal([]byte(v.AttributeValues), &m)
+		m = normalizeAttributeValues(attrs, optsByAttr, m)
 		var img *string
 		if v.Image.Valid {
 			s := v.Image.String
@@ -169,6 +170,48 @@ func nullStringPtr(ns sql.NullString) *string {
 	}
 	s := ns.String
 	return &s
+}
+
+// normalizeAttributeValues remaps stale keys (attribute name / old id) onto current attribute ids.
+func normalizeAttributeValues(
+	attrs []attrRow,
+	optsByAttr map[string][]models.AttributeOption,
+	vals map[string]string,
+) map[string]string {
+	if len(vals) == 0 {
+		return map[string]string{}
+	}
+	idSet := map[string]bool{}
+	byName := map[string]string{}
+	for _, a := range attrs {
+		idSet[a.ID] = true
+		byName[a.Name] = a.ID
+	}
+
+	out := map[string]string{}
+	for k, v := range vals {
+		if idSet[k] {
+			out[k] = v
+			continue
+		}
+		if id, ok := byName[k]; ok {
+			out[id] = v
+			continue
+		}
+		// Match value to an option label under any attribute not yet filled.
+		for _, a := range attrs {
+			if _, filled := out[a.ID]; filled {
+				continue
+			}
+			for _, opt := range optsByAttr[a.ID] {
+				if opt.Label == v {
+					out[a.ID] = v
+					break
+				}
+			}
+		}
+	}
+	return out
 }
 
 func newID() string {
@@ -301,6 +344,134 @@ func DeleteProduct(db *sqlx.DB, id string) error {
 		}
 	}
 	return nil
+}
+
+// ProductStock is a lightweight stock payload for the storefront.
+type ProductStock struct {
+	ProductID     string             `json:"productId"`
+	TotalQuantity int                `json:"totalQuantity"`
+	Variants      []VariantStock     `json:"variants"`
+	Options       []OptionStock      `json:"options"`
+}
+
+type VariantStock struct {
+	ID              string            `json:"id"`
+	SKU             string            `json:"sku"`
+	Quantity        int               `json:"quantity"`
+	InStock         bool              `json:"inStock"`
+	AttributeValues map[string]string `json:"attributeValues"`
+}
+
+type OptionStock struct {
+	AttributeID   string `json:"attributeId"`
+	AttributeName string `json:"attributeName"`
+	Label         string `json:"label"`
+	Quantity      int    `json:"quantity"`
+	InStock       bool   `json:"inStock"`
+}
+
+// GetProductStock returns per-variant and per-option quantities for a product.
+func GetProductStock(db *sqlx.DB, id string) (*ProductStock, error) {
+	p, err := GetProduct(db, id)
+	if err != nil {
+		return nil, err
+	}
+
+	total := 0
+	variants := make([]VariantStock, 0, len(p.Variants))
+	for _, v := range p.Variants {
+		qty := v.Quantity
+		if qty < 0 {
+			qty = 0
+		}
+		total += qty
+		vals := v.AttributeValues
+		if vals == nil {
+			vals = map[string]string{}
+		}
+		variants = append(variants, VariantStock{
+			ID:              v.ID,
+			SKU:             v.SKU,
+			Quantity:        qty,
+			InStock:         qty > 0,
+			AttributeValues: vals,
+		})
+	}
+
+	type agg struct {
+		attrID   string
+		attrName string
+		label    string
+		qty      int
+	}
+	byKey := map[string]*agg{}
+	for _, attr := range p.Attributes {
+		for _, opt := range attr.Options {
+			key := attr.ID + "\x00" + opt.Label
+			byKey[key] = &agg{attrID: attr.ID, attrName: attr.Name, label: opt.Label, qty: 0}
+		}
+	}
+	for _, v := range p.Variants {
+		qty := v.Quantity
+		if qty < 0 {
+			qty = 0
+		}
+		vals := v.AttributeValues
+		if len(vals) == 0 {
+			continue
+		}
+		matched := map[string]bool{}
+		for attrID, label := range vals {
+			key := attrID + "\x00" + label
+			if row, ok := byKey[key]; ok {
+				row.qty += qty
+				matched[key] = true
+				continue
+			}
+			// Keys may be stale; match label under any attribute that has this option.
+			for _, attr := range p.Attributes {
+				for _, opt := range attr.Options {
+					if opt.Label != label {
+						continue
+					}
+					k2 := attr.ID + "\x00" + label
+					if matched[k2] {
+						continue
+					}
+					if row, ok := byKey[k2]; ok {
+						row.qty += qty
+						matched[k2] = true
+					}
+				}
+			}
+		}
+	}
+
+	options := make([]OptionStock, 0, len(byKey))
+	for _, attr := range p.Attributes {
+		for _, opt := range attr.Options {
+			key := attr.ID + "\x00" + opt.Label
+			row := byKey[key]
+			qty := 0
+			if row != nil {
+				qty = row.qty
+			}
+			options = append(options, OptionStock{
+				AttributeID:   attr.ID,
+				AttributeName: attr.Name,
+				Label:         opt.Label,
+				Quantity:      qty,
+				InStock:       qty > 0,
+			})
+		}
+	}
+
+	return &ProductStock{
+		ProductID:     p.ID,
+		TotalQuantity: total,
+		Variants:      variants,
+		Options:       options,
+	}, nil
 }
 
 // WithTx wrapper to avoid import cycle with internal/db. (kept minimal here)

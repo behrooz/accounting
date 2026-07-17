@@ -150,6 +150,14 @@ func main() {
 		}
 		c.JSON(http.StatusOK, p)
 	})
+	api.GET("/store/products/:id/stock", func(c *gin.Context) {
+		stock, err := repo.GetProductStock(database, c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.JSON(http.StatusOK, stock)
+	})
 	api.POST("/checkout", func(c *gin.Context) {
 		var body repo.CheckoutRequest
 		if err := c.ShouldBindJSON(&body); err != nil {

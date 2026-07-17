@@ -21,6 +21,65 @@ import {
 } from "@/lib/media";
 import VariantsGrid from "./VariantsGrid";
 
+/** Repair variants whose attributeValues are empty/stale but attributes have options. */
+function repairProductVariants(product: Product): Product {
+  const attrs = product.attributes || [];
+  const active = attrs.filter((a) => a.options.length > 0);
+  if (!active.length) return product;
+
+  const combos = generateVariantCombinations(attrs);
+  const attrIds = active.map((a) => a.id);
+  const variants = product.variants || [];
+
+  const remap = (vals: Record<string, string>): Record<string, string> => {
+    const out: Record<string, string> = { ...vals };
+    for (const a of active) {
+      if (out[a.id]) continue;
+      if (out[a.name]) {
+        out[a.id] = out[a.name];
+        delete out[a.name];
+      }
+    }
+    return out;
+  };
+
+  const remapped = variants.map((v) => ({
+    ...v,
+    attributeValues: remap(v.attributeValues || {}),
+  }));
+
+  const allFilled = remapped.every((v) =>
+    attrIds.every((id) => !!v.attributeValues[id]),
+  );
+  if (allFilled) {
+    return { ...product, variants: remapped };
+  }
+
+  // Empty attributeValues but same count as combinations → zip labels back on.
+  const emptyCount = remapped.filter(
+    (v) => Object.keys(v.attributeValues || {}).length === 0,
+  ).length;
+  if (
+    emptyCount === remapped.length &&
+    remapped.length === combos.length &&
+    combos.length > 0 &&
+    Object.keys(combos[0] || {}).length > 0
+  ) {
+    return {
+      ...product,
+      variants: remapped.map((v, i) => ({
+        ...v,
+        attributeValues: { ...combos[i] },
+      })),
+    };
+  }
+
+  return {
+    ...product,
+    variants: mergeVariants(remapped, combos),
+  };
+}
+
 /* ─── Small inline helper: tag-style option input ───────────────────────── */
 function AddOptionInput({ onAdd }: { onAdd: (label: string) => void }) {
   const [value, setValue] = useState("");
@@ -58,9 +117,12 @@ type Props = {
 /* ─── Component ──────────────────────────────────────────────────────────── */
 export default function ProductEditor({ initialProduct, isNew }: Props) {
   const router = useRouter();
-  const [product, setProduct] = useState<Product>({
-    ...initialProduct,
-    images: initialProduct.images ?? [],
+  const [product, setProduct] = useState<Product>(() => {
+    const base: Product = {
+      ...initialProduct,
+      images: initialProduct.images ?? [],
+    };
+    return repairProductVariants(base);
   });
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);

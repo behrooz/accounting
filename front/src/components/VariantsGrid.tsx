@@ -307,6 +307,8 @@ export default function VariantsGrid({
       numericApplyCol("price", "قیمت خرید", 150),
       numericApplyCol("salePrice", "قیمت فروش", 150),
       numericApplyCol("quantity", "تعداد", 120, {
+        pinned: "left",
+        lockPinned: true,
         suppressKeyboardEvent: ({ event, editing }) =>
           editing &&
           !event.shiftKey &&

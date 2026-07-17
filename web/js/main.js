@@ -338,13 +338,29 @@
     }
     $page.html('<p class="loading-msg">در حال بارگذاری...</p>');
     var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
+
     return $.ajax({
       url: base + "/products/" + encodeURIComponent(id),
       method: "GET",
       dataType: "json"
     })
-      .done(function (row) {
-        var product = mapApiProduct(row);
+      .then(function (row) {
+        return $.ajax({
+          url: base + "/store/products/" + encodeURIComponent(id) + "/stock",
+          method: "GET",
+          dataType: "json"
+        }).then(
+          function (stock) {
+            return { row: row, stock: stock };
+          },
+          function () {
+            return { row: row, stock: null };
+          }
+        );
+      })
+      .done(function (payload) {
+        var product = mapApiProduct(payload.row);
+        product = applyStockToProduct(product, payload.stock);
         window.ABERANG_PRODUCTS = [product].concat(
           (window.ABERANG_PRODUCTS || []).filter(function (p) {
             return p.id !== product.id;
@@ -357,6 +373,25 @@
           '<p class="empty-state">محصول پیدا نشد. <a href="shop.html">بازگشت به فروشگاه</a></p>'
         );
       });
+  }
+
+  function applyStockToProduct(product, stock) {
+    if (!stock || !product) return product;
+    var byVariant = {};
+    (stock.variants || []).forEach(function (v) {
+      byVariant[v.id] = v;
+    });
+    product.variants = (product.variants || []).map(function (v) {
+      var s = byVariant[v.id];
+      if (!s) return v;
+      return Object.assign({}, v, {
+        quantity: Number(s.quantity) || 0,
+        attributeValues: s.attributeValues || v.attributeValues || {}
+      });
+    });
+    product.stockOptions = stock.options || [];
+    product.totalQuantity = Number(stock.totalQuantity) || 0;
+    return product;
   }
 
   function openCart() {
@@ -688,6 +723,16 @@
       return p;
     };
     var colors = product.colors || [];
+    var stockByLabel = {};
+    (product.stockOptions || []).forEach(function (o) {
+      var qty = Number(o.quantity) || 0;
+      var prev = stockByLabel[o.label];
+      stockByLabel[o.label] = {
+        quantity: (prev ? prev.quantity : 0) + qty,
+        inStock: (prev && prev.inStock) || !!o.inStock || qty > 0
+      };
+    });
+
     return colors.map(function (label) {
       var matching = (product.variants || []).filter(function (v) {
         var vals = v.attributeValues || {};
@@ -697,16 +742,25 @@
       });
       var match = matching[0];
       var img = match && match.image ? resolve(match.image) : "";
-      // Out of stock when every matching variant has quantity 0 (or no stock field).
       var totalQty = matching.reduce(function (sum, v) {
         return sum + (Number(v.quantity) || 0);
       }, 0);
-      var oos = matching.length > 0 && totalQty <= 0;
+      var stock = stockByLabel[label];
+      if (stock) totalQty = stock.quantity;
+      var oos = stock
+        ? !stock.inStock || stock.quantity <= 0
+        : matching.length > 0 && totalQty <= 0;
       return { label: label, image: img, oos: oos, quantity: totalQty };
     });
   }
 
   function optionIsOutOfStock(product, label) {
+    var stockHit = (product.stockOptions || []).find(function (o) {
+      return String(o.label) === String(label);
+    });
+    if (stockHit) {
+      return !stockHit.inStock || (Number(stockHit.quantity) || 0) <= 0;
+    }
     var matching = (product.variants || []).filter(function (v) {
       var vals = v.attributeValues || {};
       return Object.keys(vals).some(function (k) {
