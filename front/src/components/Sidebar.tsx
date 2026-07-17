@@ -14,6 +14,7 @@ const NAV = [
       { label: "مدیریت محصولات", href: "/products/manage" },
       { label: "کاربران", href: "/users" },
       { label: "سود و زیان", href: "/profit-loss" },
+      { label: "هزینه‌ها", href: "/expenses" },
     ],
   },
   {

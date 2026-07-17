@@ -110,3 +110,13 @@ type InvoiceItem struct {
 	Total        int64  `json:"total"`
 	CreatedAt    string `json:"createdAt"`
 }
+
+// Expense is an operating cost (rent, server, maintenance, …).
+type Expense struct {
+	ID       string `db:"id" json:"id"`
+	Title    string `db:"title" json:"title"`
+	Category string `db:"category" json:"category"`
+	Amount   int64  `db:"amount" json:"amount"`
+	Date     string `db:"expense_date" json:"date"` // YYYY-MM-DD
+	Notes    string `db:"notes" json:"notes"`
+}

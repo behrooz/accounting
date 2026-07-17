@@ -567,6 +567,64 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
+	// Expenses (operating costs)
+	authed.GET("/expenses", func(c *gin.Context) {
+		list, err := repo.ListExpenses(database, repo.ExpenseListFilter{
+			DateFrom: c.Query("dateFrom"),
+			DateTo:   c.Query("dateTo"),
+			Category: c.Query("category"),
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error", "detail": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, list)
+	})
+	authed.GET("/expenses/sum", func(c *gin.Context) {
+		total, err := repo.SumExpenses(database, repo.ExpenseListFilter{
+			DateFrom: c.Query("dateFrom"),
+			DateTo:   c.Query("dateTo"),
+			Category: c.Query("category"),
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"total": total})
+	})
+	authed.POST("/expenses", func(c *gin.Context) {
+		var expense models.Expense
+		if err := c.ShouldBindJSON(&expense); err != nil || expense.ID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		if err := repo.UpsertExpense(database, expense); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"ok": true})
+	})
+	authed.PUT("/expenses/:id", func(c *gin.Context) {
+		var expense models.Expense
+		if err := c.ShouldBindJSON(&expense); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		expense.ID = c.Param("id")
+		if err := repo.UpsertExpense(database, expense); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+	authed.DELETE("/expenses/:id", func(c *gin.Context) {
+		if err := repo.DeleteExpense(database, c.Param("id")); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
 	// Invoices
 	authed.GET("/invoices", func(c *gin.Context) {
 		invs, err := repo.ListInvoices(database, repo.InvoiceListFilter{

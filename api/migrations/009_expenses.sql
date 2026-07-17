@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS expenses (
+  id CHAR(36) PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  category VARCHAR(128) NOT NULL DEFAULT '',
+  amount BIGINT NOT NULL DEFAULT 0,
+  expense_date DATE NOT NULL,
+  notes TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY ix_expenses_date (expense_date),
+  KEY ix_expenses_category (category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

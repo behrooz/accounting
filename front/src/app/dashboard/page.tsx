@@ -13,6 +13,7 @@ import {
   Cell,
 } from "recharts";
 import { getProducts, productTotalStock, type Product } from "@/lib/products";
+import { getExpensesSum } from "@/lib/expenses";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Stats computation
@@ -171,9 +172,13 @@ const BAR_COLORS = [
 
 export default function DashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [expensesTotal, setExpensesTotal] = useState(0);
 
   useEffect(() => {
-    const load = async () => setProducts(await getProducts());
+    const load = async () => {
+      setProducts(await getProducts());
+      setExpensesTotal(await getExpensesSum());
+    };
     void load();
   }, []);
 
@@ -200,16 +205,24 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold text-[#16191f]">داشبورد</h1>
           <p className="mt-0.5 text-sm text-[#545b64]">{today}</p>
         </div>
-        <Link
-          href="/products/manage"
-          className="rounded bg-[#ec7211] px-4 py-2 text-sm font-medium text-white hover:bg-[#eb5f07] transition"
-        >
-          + محصول جدید
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/expenses"
+            className="rounded border border-[#0073bb] bg-white px-4 py-2 text-sm font-medium text-[#0073bb] hover:bg-[#e7f2f8] transition"
+          >
+            + ثبت هزینه
+          </Link>
+          <Link
+            href="/products/manage"
+            className="rounded bg-[#ec7211] px-4 py-2 text-sm font-medium text-white hover:bg-[#eb5f07] transition"
+          >
+            + محصول جدید
+          </Link>
+        </div>
       </div>
 
       {/* ── KPI row 1 ───────────────────────────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="تعداد محصولات"
           value={fmt(stats.totalProducts)}
@@ -226,6 +239,14 @@ export default function DashboardPage() {
           sub="مجموع تعداد واحدها"
           accent="blue"
         />
+        <Link href="/expenses" className="block">
+          <KpiCard
+            label="جمع هزینه‌ها"
+            value={fmtM(expensesTotal)}
+            sub="تومان — کلیک برای مدیریت"
+            accent="red"
+          />
+        </Link>
       </div>
 
       {/* ── KPI row 2 ───────────────────────────────────────────────────── */}
