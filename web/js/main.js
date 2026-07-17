@@ -802,10 +802,29 @@
         "</a>"
       : "";
 
+    var headBlock =
+      '<nav class="pdp-breadcrumb" aria-label="مسیر">' +
+      '<a href="index.html">خانه</a>' +
+      (crumbCat ? "<span>/</span>" + crumbCat : "") +
+      "<span>/</span><span>" +
+      product.name +
+      "</span></nav>" +
+      "<h1>" +
+      product.name +
+      "</h1>" +
+      '<div class="price-row">' +
+      old +
+      '<span class="price-now">' +
+      formatPrice(price) +
+      "</span></div>";
+
     $page.html(
       '<div class="pdp" data-id="' +
         product.id +
         '">' +
+        '<div class="pdp-mobile-head pdp-head-block">' +
+        headBlock +
+        "</div>" +
         '<div class="pdp-gallery" data-count="' +
         images.length +
         '">' +
@@ -831,20 +850,9 @@
           : "") +
         "</div>" +
         '<div class="pdp-info">' +
-        '<nav class="pdp-breadcrumb" aria-label="مسیر">' +
-        '<a href="index.html">خانه</a>' +
-        (crumbCat ? "<span>/</span>" + crumbCat : "") +
-        "<span>/</span><span>" +
-        product.name +
-        "</span></nav>" +
-        "<h1>" +
-        product.name +
-        "</h1>" +
-        '<div class="price-row">' +
-        old +
-        '<span class="price-now">' +
-        formatPrice(price) +
-        "</span></div>" +
+        '<div class="pdp-head-desktop pdp-head-block">' +
+        headBlock +
+        "</div>" +
         (colors
           ? '<div class="pdp-field"><span class="pdp-label">رنگ</span><div class="color-swatches pdp-swatches">' +
             colors +
@@ -955,17 +963,26 @@
       if (i >= 0) go(i);
     });
 
-    // Sticky bar
+    // Sticky bar — always visible on mobile; desktop shows after scroll past buy
     var $sticky = $page.find(".pdp-sticky");
     var $buy = $page.find(".pdp-buy");
-    function onScroll() {
+    var mobileMq = window.matchMedia("(max-width: 859px)");
+
+    function syncSticky() {
       if (!$buy.length) return;
+      if (mobileMq.matches) {
+        $sticky.prop("hidden", false);
+        return;
+      }
       var rect = $buy[0].getBoundingClientRect();
-      var show = rect.bottom < 0;
-      $sticky.prop("hidden", !show);
+      $sticky.prop("hidden", rect.bottom >= 0);
     }
-    $(window).off("scroll.pdp").on("scroll.pdp", onScroll);
-    onScroll();
+
+    $(window).off("scroll.pdp resize.pdp").on("scroll.pdp resize.pdp", syncSticky);
+    if (mobileMq.addEventListener) {
+      mobileMq.addEventListener("change", syncSticky);
+    }
+    syncSticky();
 
     go(0);
   }
