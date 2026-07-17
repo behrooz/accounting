@@ -23,3 +23,31 @@ body {
         text-decoration: none;
     }
 }
+
+@media screen {
+    .invoice-print-root {
+        position: fixed;
+        left: -10000px;
+        top: 0;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        opacity: 0;
+        pointer-events: none;
+    }
+}
+
+@media print {
+    body > :not(#invoice-print-root) {
+        display: none !important;
+    }
+
+    #invoice-print-root {
+        display: block !important;
+        position: static !important;
+        width: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+        opacity: 1 !important;
+    }
+}

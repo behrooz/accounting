@@ -14,6 +14,7 @@ import {
 import { deleteInvoice, getInvoices, type Invoice } from "@/lib/invoices";
 import { gregorianISOToJalali } from "@/lib/jalali";
 import ShamsiDatePicker from "@/components/ShamsiDatePicker";
+import { useInvoicePrint } from "@/hooks/useInvoicePrint";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -63,19 +64,19 @@ const ActionCellRenderer = ({ data, context }: ICellRendererParams) => {
   const inv = data as Invoice;
   return (
     <div className="flex h-full items-center gap-1.5">
-      <button onClick={() => ctx.handleEdit(inv.id)}
+      <button type="button" onClick={() => ctx.handleEdit(inv.id)}
         className="rounded border border-[#0073bb] bg-white px-2.5 py-1 text-xs font-medium text-[#0073bb] hover:bg-[#e7f2f8] transition">
         ویرایش
       </button>
-      <button onClick={() => ctx.handlePrint(inv.id)}
+      <button type="button" onClick={() => ctx.handlePrint(inv.id)}
         className="rounded border border-[#aab7b8] bg-white px-2.5 py-1 text-xs font-medium text-[#545b64] hover:bg-[#f2f3f3] transition">
         چاپ
       </button>
-      <button onClick={() => ctx.handleLabel(inv.id)}
+      <button type="button" onClick={() => ctx.handleLabel(inv.id)}
         className="rounded border border-[#1d8102] bg-white px-2.5 py-1 text-xs font-medium text-[#1d8102] hover:bg-[#ebf6e8] transition">
         برچسب بسته
       </button>
-      <button onClick={() => ctx.handleDelete(inv.id)}
+      <button type="button" onClick={() => ctx.handleDelete(inv.id)}
         className="rounded border border-[#d13212] bg-white px-2.5 py-1 text-xs font-medium text-[#d13212] hover:bg-[#fdf3f1] transition">
         حذف
       </button>
@@ -128,6 +129,7 @@ const emptyFilters = (): SalesFilters => ({
 export default function SalesPage() {
   const router = useRouter();
   const gridRef = useRef<AgGridReact<Invoice>>(null);
+  const { startPrint, printPortal } = useInvoicePrint();
   const [rowData, setRowData] = useState<Invoice[]>([]);
   const [filters, setFilters] = useState<SalesFilters>(emptyFilters);
   const [loading, setLoading] = useState(false);
@@ -172,13 +174,13 @@ export default function SalesPage() {
   const handleEdit = useCallback((id: string) => router.push(`/sales/${id}`), [router]);
 
   const handlePrint = useCallback(
-    (id: string) => router.push(`/sales/${id}/print?mode=invoice`),
-    [router],
+    (id: string) => void startPrint({ invoiceId: id, mode: "invoice" }),
+    [startPrint],
   );
 
   const handleLabel = useCallback(
-    (id: string) => router.push(`/sales/${id}/print?mode=label`),
-    [router],
+    (id: string) => void startPrint({ invoiceId: id, mode: "label" }),
+    [startPrint],
   );
 
   const handleDelete = useCallback(async (id: string) => {
@@ -206,6 +208,7 @@ export default function SalesPage() {
 
   return (
     <div className="flex w-full flex-col gap-4 p-6">
+      {printPortal}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-[#16191f]">فاکتورها</h1>

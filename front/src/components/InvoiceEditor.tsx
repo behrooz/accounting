@@ -13,6 +13,7 @@ import {
   type InvoiceItem,
 } from "@/lib/invoices";
 import ShamsiDatePicker from "@/components/ShamsiDatePicker";
+import { useInvoicePrint } from "@/hooks/useInvoicePrint";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Local item state (same shape as InvoiceItem)
@@ -62,6 +63,7 @@ export default function InvoiceEditor({
   isNew = true,
 }: Props) {
   const router = useRouter();
+  const { startPrint, printPortal } = useInvoicePrint();
   const invoiceId = useRef(initialInvoice?.id ?? crypto.randomUUID());
 
   /* ── Data from localStorage ─────────────────────────────────────────── */
@@ -264,8 +266,9 @@ export default function InvoiceEditor({
     initialInvoice?.status === "confirmed" ? "confirmed" : "draft";
 
   const handlePrint = async () => {
-    await saveInvoice(buildInvoice(currentStatus));
-    router.push(`/sales/${invoiceId.current}/print?mode=invoice`);
+    const invoice = buildInvoice(currentStatus);
+    await saveInvoice(invoice);
+    await startPrint({ invoice, mode: "invoice" });
   };
 
   const handlePrintLabel = async () => {
@@ -273,8 +276,9 @@ export default function InvoiceEditor({
       alert("اطلاعات مشتری / آدرس سفارش برای برچسب بسته ناقص است.");
       return;
     }
-    await saveInvoice(buildInvoice(currentStatus));
-    router.push(`/sales/${invoiceId.current}/print?mode=label`);
+    const invoice = buildInvoice(currentStatus);
+    await saveInvoice(invoice);
+    await startPrint({ invoice, mode: "label" });
   };
 
   /* ── Input class helper ──────────────────────────────────────────────── */
@@ -287,6 +291,7 @@ export default function InvoiceEditor({
   /* ───────────────────────────────────────────────────────────────────── */
   return (
     <>
+      {printPortal}
       {/* ══════════════════════════════════════════════════════════════════
           SCREEN VIEW  (hidden when printing)
       ══════════════════════════════════════════════════════════════════ */}
