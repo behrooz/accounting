@@ -178,6 +178,23 @@ func main() {
 		cust.Addresses = addrs
 		c.JSON(http.StatusOK, cust)
 	})
+	api.GET("/store/orders", func(c *gin.Context) {
+		phone := strings.TrimSpace(c.Query("phone"))
+		if phone == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "phone required"})
+			return
+		}
+		if _, err := repo.FindCustomerByPhone(database, phone); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "customer not found"})
+			return
+		}
+		invs, err := repo.ListInvoices(database, repo.InvoiceListFilter{CustomerPhone: phone})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		c.JSON(http.StatusOK, invs)
+	})
 	api.POST("/store/register", func(c *gin.Context) {
 		var body struct {
 			Phone string `json:"phone"`

@@ -6,7 +6,7 @@
   <title>حساب کاربری | آبرنگ</title>
   <meta name="description" content="ورود و عضویت در فروشگاه آبرنگ" />
   <link href="https://fonts.cdnfonts.com/css/iranyekan" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=11" />
+  <link rel="stylesheet" href="css/style.css?v=12" />
 </head>
 <body class="page-account">
   <div class="top-banner" id="topBanner">
@@ -101,13 +101,24 @@
     </div>
 
     <div id="accountLoggedIn" class="account-logged-in" hidden>
-      <section class="account-card">
-        <h2>خوش آمدید</h2>
+      <section class="account-card account-profile">
+        <h2>حساب من</h2>
         <p class="account-user-name" id="accountUserName"></p>
         <p class="account-user-phone" id="accountUserPhone" dir="ltr"></p>
-        <div class="account-actions">
-          <a class="btn-account btn-account-outline" href="checkout.html">سفارش‌های من / تسویه</a>
-          <button type="button" class="btn-account btn-account-muted" id="logoutBtn">خروج</button>
+        <button type="button" class="btn-account btn-account-muted" id="logoutBtn">خروج</button>
+      </section>
+
+      <section class="account-card">
+        <h2>سفارش‌های من</h2>
+        <div id="ordersList" class="account-list">
+          <p class="account-loading">در حال بارگذاری سفارش‌ها...</p>
+        </div>
+      </section>
+
+      <section class="account-card">
+        <h2>آدرس‌های من</h2>
+        <div id="addressesList" class="account-list">
+          <p class="account-loading">در حال بارگذاری آدرس‌ها...</p>
         </div>
       </section>
     </div>
@@ -168,11 +179,11 @@
   </nav>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-  <script src="js/runtime-config.js?v=11"></script>
-  <script src="js/config.js?v=11"></script>
-  <script src="js/data.js?v=11"></script>
-  <script src="js/auth.js?v=11"></script>
-  <script src="js/main.js?v=11"></script>
-  <script src="js/account.js?v=11"></script>
+  <script src="js/runtime-config.js?v=12"></script>
+  <script src="js/config.js?v=12"></script>
+  <script src="js/data.js?v=12"></script>
+  <script src="js/auth.js?v=12"></script>
+  <script src="js/main.js?v=12"></script>
+  <script src="js/account.js?v=12"></script>
 </body>
 </html>

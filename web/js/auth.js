@@ -38,6 +38,10 @@
 
   function wireAccountLinks() {
     $('a[href="#account"], a[href="index.html#account"]').attr("href", accountHref());
+    $('a[aria-label="حساب کاربری"]').attr("href", accountHref());
+    $(".bottom-nav-item").filter(function () {
+      return $(this).text().trim().indexOf("حساب") >= 0;
+    }).attr("href", accountHref());
   }
 
   global.AberangAuth = {

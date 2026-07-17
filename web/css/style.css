@@ -1778,3 +1778,73 @@ body.page-product {
 .page-account .icon-btn.is-active {
   color: var(--red);
 }
+
+.page-account .account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.page-account .account-loading,
+.page-account .account-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.page-account .account-order-card,
+.page-account .account-address-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.85rem 0.9rem;
+  background: #fafafa;
+}
+
+.page-account .account-order-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.page-account .account-badge {
+  font-size: 0.75rem;
+  background: #ebf6e8;
+  color: #1d8102;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+}
+
+.page-account .account-order-meta {
+  margin: 0.15rem 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.page-account .account-order-total {
+  margin: 0.45rem 0 0;
+  font-weight: 700;
+}
+
+.page-account .account-address-card.is-default {
+  border-color: #0073bb;
+  background: #f7fbff;
+}
+
+.page-account .account-address-card p {
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.page-account .account-address-card em {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: #0073bb;
+}
+
+.page-account .account-profile .btn-account {
+  margin-top: 0.75rem;
+}

@@ -48,10 +48,11 @@ type itemRow struct {
 }
 
 type InvoiceListFilter struct {
-	DateFrom     string
-	DateTo       string
-	Number       string
-	CustomerName string
+	DateFrom      string
+	DateTo        string
+	Number        string
+	CustomerName  string
+	CustomerPhone string
 }
 
 func ListInvoices(db *sqlx.DB, f InvoiceListFilter) ([]models.Invoice, error) {
@@ -79,6 +80,10 @@ func ListInvoices(db *sqlx.DB, f InvoiceListFilter) ([]models.Invoice, error) {
 	if name := strings.TrimSpace(f.CustomerName); name != "" {
 		q += " AND customer_name LIKE ?"
 		args = append(args, "%"+name+"%")
+	}
+	if phone := strings.TrimSpace(f.CustomerPhone); phone != "" {
+		q += " AND customer_phone = ?"
+		args = append(args, phone)
 	}
 	q += " ORDER BY date DESC, created_at DESC"
 

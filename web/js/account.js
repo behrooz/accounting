@@ -16,6 +16,19 @@
     return /^09\d{9}$/.test(phone);
   }
 
+  function formatPrice(n) {
+    return Number(n || 0).toLocaleString("fa-IR") + " تومان";
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "—";
+    return String(iso).slice(0, 10);
+  }
+
+  function statusLabel(status) {
+    return status === "confirmed" ? "تأیید‌شده" : "پیش‌نویس";
+  }
+
   function showGuestView() {
     $("#accountGuest").prop("hidden", false);
     $("#accountLoggedIn").prop("hidden", true);
@@ -28,14 +41,137 @@
     $("#accountUserName").text(session.name || "کاربر");
   }
 
+  function renderOrders(orders) {
+    var $list = $("#ordersList");
+    if (!orders || !orders.length) {
+      $list.html('<p class="account-empty">هنوز سفارشی ثبت نکرده‌اید.</p>');
+      return;
+    }
+
+    $list.html(
+      orders
+        .map(function (order) {
+          var itemsCount = (order.items || []).length;
+          var source =
+            order.source === "storefront"
+              ? "سفارش فروشگاه"
+              : order.source || "فاکتور";
+          return (
+            '<article class="account-order-card">' +
+            '<div class="account-order-head">' +
+            "<strong>" +
+            (order.number || "—") +
+            "</strong>" +
+            '<span class="account-badge">' +
+            statusLabel(order.status) +
+            "</span>" +
+            "</div>" +
+            '<p class="account-order-meta">تاریخ: ' +
+            formatDate(order.date) +
+            " · " +
+            source +
+            "</p>" +
+            '<p class="account-order-meta">تعداد اقلام: ' +
+            itemsCount.toLocaleString("fa-IR") +
+            "</p>" +
+            (order.shippingMethod
+              ? '<p class="account-order-meta">ارسال: ' + order.shippingMethod + "</p>"
+              : "") +
+            '<p class="account-order-total">' +
+            formatPrice(order.total) +
+            "</p>" +
+            "</article>"
+          );
+        })
+        .join("")
+    );
+  }
+
+  function renderAddresses(addresses) {
+    var $list = $("#addressesList");
+    if (!addresses || !addresses.length) {
+      $list.html(
+        '<p class="account-empty">آدرسی ذخیره نشده است. هنگام ثبت سفارش می‌توانید آدرس جدید اضافه کنید.</p>'
+      );
+      return;
+    }
+
+    $list.html(
+      addresses
+        .map(function (addr) {
+          var line = [addr.province, addr.city, addr.address]
+            .filter(Boolean)
+            .join("، ");
+          return (
+            '<article class="account-address-card' +
+            (addr.isDefault ? " is-default" : "") +
+            '">' +
+            "<strong>" +
+            (addr.title || "آدرس") +
+            (addr.isDefault ? ' <em>پیش‌فرض</em>' : "") +
+            "</strong>" +
+            (addr.fullName ? "<p>" + addr.fullName + "</p>" : "") +
+            (addr.phone
+              ? '<p dir="ltr">' + addr.phone + "</p>"
+              : "") +
+            "<p>" +
+            line +
+            (addr.postalCode ? " · کدپستی " + addr.postalCode : "") +
+            "</p>" +
+            "</article>"
+          );
+        })
+        .join("")
+    );
+  }
+
+  function loadAccountDashboard(phone) {
+    phone = normalizePhone(phone);
+    if (!phone) return;
+
+    $("#ordersList").html('<p class="account-loading">در حال بارگذاری سفارش‌ها...</p>');
+    $("#addressesList").html('<p class="account-loading">در حال بارگذاری آدرس‌ها...</p>');
+
+    $.when(
+      $.ajax({
+        url: AberangAuth.apiBase() + "/store/customer",
+        method: "GET",
+        data: { phone: phone },
+        dataType: "json"
+      }),
+      $.ajax({
+        url: AberangAuth.apiBase() + "/store/orders",
+        method: "GET",
+        data: { phone: phone },
+        dataType: "json"
+      })
+    )
+      .done(function (customerResp, ordersResp) {
+        var customer = customerResp[0];
+        var orders = ordersResp[0];
+        AberangAuth.setSession({
+          id: customer.id || "",
+          phone: customer.phone || phone,
+          name: customer.name || ""
+        });
+        showLoggedInView(AberangAuth.getSession());
+        renderOrders(Array.isArray(orders) ? orders : []);
+        renderAddresses(customer.addresses || []);
+      })
+      .fail(function () {
+        AberangAuth.clearSession();
+        showGuestView();
+        alert("نشست شما منقضی شده. دوباره وارد شوید.");
+      });
+  }
+
   function finishLogin(customer) {
     AberangAuth.setSession({
       id: customer.id || "",
       phone: customer.phone || "",
       name: customer.name || ""
     });
-    var redirect = new URLSearchParams(window.location.search).get("next");
-    window.location.href = redirect || "index.html";
+    loadAccountDashboard(customer.phone);
   }
 
   function initAccountPage() {
@@ -44,6 +180,7 @@
     var session = AberangAuth.getSession();
     if (session && session.phone) {
       showLoggedInView(session);
+      loadAccountDashboard(session.phone);
     } else {
       showGuestView();
     }
@@ -121,6 +258,7 @@
     $("#logoutBtn").on("click", function () {
       AberangAuth.clearSession();
       showGuestView();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
   }
 
