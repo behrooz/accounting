@@ -1128,6 +1128,54 @@ html[dir="rtl"] .cart-drawer-panel {
   gap: 0.5rem;
 }
 
+.pdp-color-grid {
+  gap: 0.45rem;
+}
+
+.pdp-color-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.5rem;
+  min-height: 2.35rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #cfcfcf;
+  border-radius: 2px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-family: inherit;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.pdp-color-chip.is-active {
+  border-color: var(--red);
+  color: var(--red);
+  box-shadow: inset 0 0 0 1px var(--red);
+}
+
+.pdp-color-chip.is-oos::before,
+.pdp-color-chip.is-oos::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 118%;
+  height: 1px;
+  background: var(--red);
+  pointer-events: none;
+}
+
+.pdp-color-chip.is-oos::before {
+  transform: rotate(28deg);
+}
+
+.pdp-color-chip.is-oos::after {
+  transform: rotate(-28deg);
+}
+
 .pdp-swatch {
   display: inline-flex;
   align-items: center;
@@ -1435,25 +1483,27 @@ body.page-checkout {
 .pdp-buy {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 0.65rem;
+  gap: 0.55rem;
   align-items: stretch;
-  margin-top: 0.25rem;
+  margin-top: 0.15rem;
+  margin-bottom: 0.85rem;
 }
 
 .pdp-qty {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  border: 1px solid #d0d0d0;
+  border-radius: 2px;
   overflow: hidden;
   min-width: 108px;
+  background: #fff;
 }
 
 .pdp-qty button {
   width: 36px;
-  height: 44px;
+  height: 46px;
   border: 0;
-  background: #f7f7f7;
+  background: #fff;
   cursor: pointer;
   font-size: 1.15rem;
   color: var(--ink);
@@ -1461,11 +1511,13 @@ body.page-checkout {
 
 .pdp-qty input {
   width: 36px;
-  height: 44px;
+  height: 46px;
   border: 0;
   text-align: center;
   -moz-appearance: textfield;
   appearance: textfield;
+  font-family: inherit;
+  font-size: 0.95rem;
 }
 
 .pdp-qty input::-webkit-outer-spin-button,
@@ -1476,35 +1528,122 @@ body.page-checkout {
 
 .pdp-buy .btn-red {
   width: 100%;
-  height: 44px;
+  height: 46px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 2px;
   background: var(--red);
   color: #fff;
   font-weight: 700;
+  font-size: 0.95rem;
   cursor: pointer;
+  font-family: inherit;
 }
 
 .pdp-buy .btn-red:active {
   background: var(--red-dark);
 }
 
+.pdp-extras {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.35rem 0 1rem;
+}
+
+.pdp-extra-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: right;
+}
+
+.pdp-extra-link svg {
+  flex: 0 0 auto;
+  color: #555;
+}
+
+.pdp-notify {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.86rem;
+  color: var(--ink);
+  cursor: pointer;
+  line-height: 1.45;
+}
+
+.pdp-notify input {
+  margin-top: 0.2rem;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--red);
+}
+
 .pdp-desc {
-  margin-top: 1.5rem;
-  padding-top: 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.85rem;
   border-top: 1px solid var(--line);
 }
 
-.pdp-desc h2 {
-  margin: 0 0 0.5rem;
+.pdp-desc summary {
+  list-style: none;
+  cursor: pointer;
+  color: var(--red);
   font-size: 1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  user-select: none;
+}
+
+.pdp-desc summary::-webkit-details-marker {
+  display: none;
+}
+
+.pdp-desc summary::after {
+  content: "▾";
+  font-size: 0.85rem;
+  color: var(--red);
+  transition: transform 0.2s ease;
+}
+
+.pdp-desc:not([open]) summary::after {
+  transform: rotate(-90deg);
 }
 
 .product-desc {
-  margin: 0;
-  color: var(--muted);
+  margin: 0.75rem 0 0;
+  color: var(--ink);
   font-size: 0.92rem;
   white-space: pre-wrap;
+  line-height: 1.75;
+}
+
+.pdp-info .pdp-head-block h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.pdp-info .pdp-head-block .price-now {
+  color: var(--red);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.pdp-info .pdp-breadcrumb {
+  margin-bottom: 0.55rem;
+  font-size: 0.72rem;
 }
 
 body.page-product {
@@ -1515,45 +1654,32 @@ body.page-product {
   margin-bottom: 0;
 }
 
-.pdp-mobile-head {
-  display: none;
-}
-
-.pdp-head-desktop {
-  display: block;
-}
-
 @media (max-width: 859px) {
   .product-page {
     padding: 0 0 1rem;
     max-width: 100%;
   }
 
-  .pdp-mobile-head {
-    display: block;
-    padding: 0.75rem 0.9rem 0.35rem;
-    background: #fff;
-    width: 100%;
-    max-width: 100%;
+  .pdp-info {
+    padding: 0.85rem 0.75rem 1.25rem;
   }
 
-  .pdp-head-desktop {
-    display: none;
+  .pdp-info .pdp-head-block h1 {
+    font-size: 1.28rem;
   }
 
-  .pdp-mobile-head h1 {
-    margin: 0 0 0.35rem;
-    font-size: 1.05rem;
-    line-height: 1.4;
+  .pdp-info .pdp-head-block .price-now {
+    font-size: 1.15rem;
   }
 
-  .pdp-mobile-head .price-now {
-    font-size: 1.05rem;
+  .pdp-colors {
+    margin-bottom: 0.85rem;
   }
 
-  .pdp-mobile-head .pdp-breadcrumb {
-    margin-bottom: 0.45rem;
-    font-size: 0.7rem;
+  .pdp-color-chip {
+    min-width: 4.25rem;
+    min-height: 2.5rem;
+    font-size: 0.86rem;
   }
 
   .pdp-gallery {
@@ -1651,10 +1777,6 @@ body.page-product {
     border-radius: 0;
   }
 
-  .pdp-info {
-    padding: 0.85rem 0.9rem 1rem;
-  }
-
   .pdp-field {
     margin-bottom: 0.85rem;
   }
@@ -1665,13 +1787,8 @@ body.page-product {
   }
 
   .pdp-buy {
-    grid-template-columns: 1fr;
-    gap: 0.55rem;
-  }
-
-  .pdp-qty {
-    justify-content: center;
-    width: 100%;
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem;
   }
 
   .pdp-sticky {

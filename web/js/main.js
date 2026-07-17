@@ -677,14 +677,20 @@
     };
     var colors = product.colors || [];
     return colors.map(function (label) {
-      var match = (product.variants || []).find(function (v) {
+      var matching = (product.variants || []).filter(function (v) {
         var vals = v.attributeValues || {};
         return Object.keys(vals).some(function (k) {
           return String(vals[k]) === String(label);
         });
       });
+      var match = matching[0];
       var img = match && match.image ? resolve(match.image) : "";
-      return { label: label, image: img };
+      var oos =
+        matching.length > 0 &&
+        matching.every(function (v) {
+          return Number(v.quantity) <= 0;
+        });
+      return { label: label, image: img, oos: oos };
     });
   }
 
@@ -768,25 +774,25 @@
       })
       .join("");
 
+    var firstInStock = colorMeta.findIndex(function (c) {
+      return !c.oos;
+    });
+    if (firstInStock < 0) firstInStock = 0;
+
     var colors = colorMeta
       .map(function (c, idx) {
-        var imgHtml = c.image
-          ? '<span class="swatch-img"><img src="' +
-            c.image +
-            '" alt="" loading="lazy" /></span>'
-          : "";
         return (
-          '<button type="button" class="js-color pdp-swatch' +
-          (idx === 0 ? " is-active" : "") +
+          '<button type="button" class="js-color pdp-color-chip' +
+          (idx === firstInStock ? " is-active" : "") +
+          (c.oos ? " is-oos" : "") +
           '" data-color="' +
-          c.label +
+          escapeHtml(c.label) +
           '"' +
           (c.image ? ' data-image="' + c.image + '"' : "") +
+          (c.oos ? ' aria-disabled="true"' : "") +
           ">" +
-          imgHtml +
-          "<span>" +
-          c.label +
-          "</span></button>"
+          escapeHtml(c.label) +
+          "</button>"
         );
       })
       .join("");
@@ -807,10 +813,10 @@
       '<a href="index.html">خانه</a>' +
       (crumbCat ? "<span>/</span>" + crumbCat : "") +
       "<span>/</span><span>" +
-      product.name +
+      escapeHtml(product.name) +
       "</span></nav>" +
       "<h1>" +
-      product.name +
+      escapeHtml(product.name) +
       "</h1>" +
       '<div class="price-row">' +
       old +
@@ -818,13 +824,31 @@
       formatPrice(price) +
       "</span></div>";
 
+    var extras =
+      '<div class="pdp-extras">' +
+      '<button type="button" class="pdp-extra-link js-wishlist">' +
+      '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 6.5L9.5 17 4 11.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      "<span>جستجوی لیست علاقه مندی</span></button>" +
+      '<button type="button" class="pdp-extra-link js-size-guide">' +
+      '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h16v8H4z"/><path d="M8 8v3M12 8v5M16 8v3" stroke-linecap="round"/></svg>' +
+      "<span>راهنمای اندازه (جدول سایز)</span></button>" +
+      '<label class="pdp-notify">' +
+      '<input type="checkbox" class="js-stock-notify" />' +
+      "<span>میخوای وقتی موجود شد SMS بدم و بگم که شارژ شده؟</span></label>" +
+      "</div>";
+
+    var descBlock = product.desc
+      ? '<details class="pdp-desc" open>' +
+        '<summary>توضیحات</summary>' +
+        '<div class="product-desc">' +
+        escapeHtml(product.desc) +
+        "</div></details>"
+      : "";
+
     $page.html(
       '<div class="pdp" data-id="' +
         product.id +
         '">' +
-        '<div class="pdp-mobile-head pdp-head-block">' +
-        headBlock +
-        "</div>" +
         '<div class="pdp-gallery" data-count="' +
         images.length +
         '">' +
@@ -856,11 +880,11 @@
           : "") +
         "</div>" +
         '<div class="pdp-info">' +
-        '<div class="pdp-head-desktop pdp-head-block">' +
+        '<div class="pdp-head-block">' +
         headBlock +
         "</div>" +
         (colors
-          ? '<div class="pdp-field"><span class="pdp-label">رنگ</span><div class="color-swatches pdp-swatches">' +
+          ? '<div class="pdp-field pdp-colors"><div class="color-swatches pdp-swatches pdp-color-grid">' +
             colors +
             "</div></div>"
           : "") +
@@ -875,16 +899,13 @@
         product.id +
         '">افزودن به سبد خرید</button>' +
         "</div>" +
-        (product.desc
-          ? '<div class="pdp-desc"><h2>توضیحات</h2><p class="product-desc">' +
-            product.desc +
-            "</p></div>"
-          : "") +
+        extras +
+        descBlock +
         "</div>" +
         '<div class="pdp-sticky" hidden>' +
         '<div class="pdp-sticky-inner">' +
         '<div class="pdp-sticky-meta"><strong>' +
-        product.name +
+        escapeHtml(product.name) +
         '</strong><span class="price-now">' +
         formatPrice(price) +
         "</span></div>" +
@@ -1251,12 +1272,30 @@
         alert("این ترکیب ویژگی در موجودی نیست. لطفاً رنگ و ویژگی‌های دیگر را تغییر دهید.");
         return;
       }
+      if ($("#productPage .js-color.is-active.is-oos").length) {
+        alert("این رنگ فعلاً موجود نیست.");
+        return;
+      }
       addToCart(p, sel, qty);
     });
 
     $(document).on("click", ".js-color", function () {
       $(this).closest(".color-swatches, .pdp-swatches").find(".js-color").removeClass("is-active");
       $(this).addClass("is-active");
+    });
+
+    $(document).on("click", ".js-wishlist", function () {
+      alert("به‌زودی می‌توانید لیست علاقه‌مندی را جستجو کنید.");
+    });
+
+    $(document).on("click", ".js-size-guide", function () {
+      alert("جدول سایز به‌زودی اضافه می‌شود.");
+    });
+
+    $(document).on("change", ".js-stock-notify", function () {
+      if (this.checked) {
+        alert("وقتی موجود شد به شما اطلاع می‌دهیم.");
+      }
     });
 
     $(document).on("click", ".js-attr", function () {
