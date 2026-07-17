@@ -341,32 +341,112 @@
     };
   }
 
+  function faNum(n) {
+    return Number(n || 0).toLocaleString("fa-IR");
+  }
+
+  function updateShopMeta(list) {
+    var params = shopListParams();
+    var crumb = "فروشگاه";
+    var q = params.q;
+    if (q) {
+      crumb = "نتایج «" + q + "»";
+    } else if (params.sort === "sale" || window.location.hash === "#sale") {
+      crumb = "فروش ویژه";
+    } else if (params.categoryId && Array.isArray(window.ABERANG_CATEGORIES)) {
+      var match = window.ABERANG_CATEGORIES.find(function (c) {
+        return String(c.id) === String(params.categoryId);
+      });
+      if (match) crumb = match.name;
+    }
+    $("#shopCrumbCurrent").text(crumb);
+    $("#shopTitle").text(crumb);
+
+    var total = (list || []).length;
+    if (total === 0) {
+      $("#shopResultCount").text("۰ نتیجه");
+    } else {
+      $("#shopResultCount").text(
+        "نمایش " + faNum(1) + "–" + faNum(total) + " از " + faNum(total) + " نتیجه"
+      );
+    }
+
+    $(".shop-sort-option").removeClass("is-active");
+    $('.shop-sort-option[data-sort="' + (params.sort || "new") + '"]').addClass("is-active");
+    $("#sortFilter").val(params.sort || "new");
+
+    renderShopFilterCats();
+  }
+
+  function openShopSheet(id) {
+    closeShopSheets();
+    $("#" + id).prop("hidden", false);
+    $("body").css("overflow", "hidden");
+  }
+
+  function closeShopSheets() {
+    $(".shop-sheet").prop("hidden", true);
+    if (!$("#menuDrawer").hasClass("is-open") && !$("#cartDrawer").hasClass("is-open")) {
+      $("body").css("overflow", "");
+    }
+  }
+
+  function renderShopFilterCats() {
+    var $wrap = $("#shopFilterCats");
+    if (!$wrap.length) return;
+    var cats = window.ABERANG_CATEGORIES || [];
+    var activeId = queryParam("categoryId") || "";
+    var activeSlug = queryParam("cat") || "";
+    var html =
+      '<a href="shop.html" class="shop-filter-cat' +
+      (!activeId && !activeSlug ? " is-active" : "") +
+      '" data-all="1">همه محصولات</a>';
+    html += cats
+      .map(function (cat) {
+        var active =
+          (activeId && String(cat.id) === String(activeId)) ||
+          (activeSlug && cat.slug === activeSlug);
+        return (
+          '<a href="' +
+          categoryHref(cat) +
+          '" class="shop-filter-cat' +
+          (active ? " is-active" : "") +
+          '">' +
+          cat.name +
+          "</a>"
+        );
+      })
+      .join("");
+    $wrap.html(html);
+  }
+
+  function applyShopSort(sort) {
+    sort = sort || "new";
+    $("#sortFilter").val(sort);
+    var url = new URL(window.location.href);
+    if (sort && sort !== "new") url.searchParams.set("sort", sort);
+    else url.searchParams.delete("sort");
+    if (sort === "sale") url.hash = "sale";
+    else if (url.hash === "#sale") url.hash = "";
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+    closeShopSheets();
+    loadShopProducts();
+  }
+
   function loadShopProducts() {
     var $grid = $("#shopProducts");
     if (!$grid.length) return;
 
     var params = shopListParams();
-    if ($("#sortFilter").length) {
-      $("#sortFilter").val(params.sort);
-    }
+    $("#sortFilter").val(params.sort || "new");
 
     var q = params.q;
-    if (q) {
-      $("#shopSearchInput").val(q);
-      $("#shopTitle").text("نتایج «" + q + "»");
-    } else if (params.sort === "sale" || window.location.hash === "#sale") {
-      $("#shopTitle").text("فروش ویژه");
-    } else if (params.categoryId && Array.isArray(window.ABERANG_CATEGORIES)) {
-      var match = window.ABERANG_CATEGORIES.find(function (c) {
-        return String(c.id) === String(params.categoryId);
-      });
-      $("#shopTitle").text(match ? match.name : "فروشگاه");
-    } else {
-      $("#shopTitle").text("فروشگاه");
-    }
+    if (q) $("#shopSearchInput").val(q);
 
+    updateShopMeta([]);
     $grid.html('<p class="cat-loading">در حال بارگذاری محصولات...</p>');
     $("#shopEmpty").prop("hidden", true);
+    $("#shopResultCount").text("در حال بارگذاری…");
 
     var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
     var data = { sort: params.sort || "new" };
@@ -389,6 +469,7 @@
         window.ABERANG_PRODUCTS = [];
         $grid.empty();
         $("#shopEmpty").prop("hidden", false).text("دریافت محصولات ناموفق بود.");
+        $("#shopResultCount").text("۰ نتیجه");
       });
   }
 
@@ -521,6 +602,7 @@
     if (!$grid.length) return;
 
     var list = getProducts();
+    updateShopMeta(list);
     $grid.html(list.map(productCard).join(""));
     $("#shopEmpty").prop("hidden", list.length > 0);
     if (list.length === 0) {
@@ -1240,6 +1322,7 @@
         window.ABERANG_CATEGORIES = list;
         renderCategoryGrid(list);
         renderMenuCategories(list);
+        renderShopFilterCats();
         // Enrich product category slugs once categories are known
         if (Array.isArray(window.ABERANG_PRODUCTS) && window.ABERANG_PRODUCTS.length) {
           window.ABERANG_PRODUCTS.forEach(function (p) {
@@ -1299,6 +1382,7 @@
         closeCart();
         closeMenu();
         closeCheckout();
+        closeShopSheets();
       }
     });
 
@@ -1429,18 +1513,16 @@
       $(this).val(n);
     });
 
-    $("#sortFilter").on("change", function () {
-      var sort = $(this).val() || "new";
-      var url = new URL(window.location.href);
-      if (sort && sort !== "new") url.searchParams.set("sort", sort);
-      else url.searchParams.delete("sort");
-      if (sort === "sale") {
-        url.hash = "sale";
-      } else if (url.hash === "#sale") {
-        url.hash = "";
-      }
-      history.replaceState(null, "", url.pathname + url.search + url.hash);
-      loadShopProducts();
+    $("#shopFilterBtn").on("click", function () {
+      renderShopFilterCats();
+      openShopSheet("shopFilterSheet");
+    });
+    $("#shopSortBtn").on("click", function () {
+      openShopSheet("shopSortSheet");
+    });
+    $(document).on("click", "[data-close-sheet]", closeShopSheets);
+    $(document).on("click", ".shop-sort-option", function () {
+      applyShopSort($(this).data("sort"));
     });
   });
 })(jQuery);

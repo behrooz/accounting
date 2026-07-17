@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>فروشگاه | آبرنگ</title>
   <link href="https://fonts.cdnfonts.com/css/iranyekan" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=20" />
+  <link rel="stylesheet" href="css/style.css?v=21" />
 </head>
 <body class="page-shop">
   <div class="top-banner" id="topBanner">
@@ -64,20 +64,68 @@
   </aside>
 
   <main class="shop-page">
-    <div class="shop-toolbar">
-      <h1 id="shopTitle">فروشگاه</h1>
-      <div class="shop-filters">
-        <select id="sortFilter" aria-label="مرتب‌سازی">
-          <option value="new">جدیدترین</option>
-          <option value="price-asc">ارزان‌ترین</option>
-          <option value="price-desc">گران‌ترین</option>
-          <option value="sale">حراج</option>
-        </select>
-      </div>
+    <div class="shop-meta">
+      <nav class="shop-breadcrumb" aria-label="مسیر">
+        <a href="index.html">خانه</a>
+        <span>/</span>
+        <span id="shopCrumbCurrent">فروشگاه</span>
+      </nav>
+      <p class="shop-result-count" id="shopResultCount">در حال بارگذاری…</p>
     </div>
+
+    <div class="shop-actions">
+      <button type="button" class="shop-action-btn" id="shopFilterBtn" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+          <path d="M4 6h16M7 12h10M10 18h4" stroke-linecap="round"/>
+        </svg>
+        <span>فیلترهای جستجو</span>
+      </button>
+      <button type="button" class="shop-action-btn shop-sort-btn" id="shopSortBtn" aria-label="مرتب‌سازی" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+          <path d="M8 4v16M5 7l3-3 3 3M16 20V4M13 17l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <input type="hidden" id="sortFilter" value="new" />
+
     <div class="product-grid" id="shopProducts"></div>
     <p class="empty-state" id="shopEmpty" hidden>محصولی پیدا نشد.</p>
   </main>
+
+  <!-- Sort sheet -->
+  <div class="shop-sheet" id="shopSortSheet" hidden>
+    <div class="shop-sheet-backdrop" data-close-sheet></div>
+    <div class="shop-sheet-panel" role="dialog" aria-label="مرتب‌سازی">
+      <div class="shop-sheet-head">
+        <h2>مرتب‌سازی</h2>
+        <button type="button" class="shop-sheet-close" data-close-sheet aria-label="بستن">×</button>
+      </div>
+      <div class="shop-sheet-body shop-sort-options">
+        <button type="button" class="shop-sort-option is-active" data-sort="new">جدیدترین</button>
+        <button type="button" class="shop-sort-option" data-sort="price-asc">ارزان‌ترین</button>
+        <button type="button" class="shop-sort-option" data-sort="price-desc">گران‌ترین</button>
+        <button type="button" class="shop-sort-option" data-sort="sale">حراج</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter sheet -->
+  <div class="shop-sheet" id="shopFilterSheet" hidden>
+    <div class="shop-sheet-backdrop" data-close-sheet></div>
+    <div class="shop-sheet-panel" role="dialog" aria-label="فیلترهای جستجو">
+      <div class="shop-sheet-head">
+        <h2>فیلترهای جستجو</h2>
+        <button type="button" class="shop-sheet-close" data-close-sheet aria-label="بستن">×</button>
+      </div>
+      <div class="shop-sheet-body">
+        <p class="shop-filter-label">دسته‌بندی</p>
+        <div class="shop-filter-cats" id="shopFilterCats">
+          <a href="shop.html" class="shop-filter-cat is-active" data-all="1">همه محصولات</a>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <footer class="site-footer compact">
     <p class="copyright">© ۱۴۰۵ آبرنگ</p>
@@ -138,6 +186,6 @@
   <script src="js/config.js?v=12"></script>
   <script src="js/data.js?v=12"></script>
   <script src="js/auth.js?v=12"></script>
-  <script src="js/main.js?v=20"></script>
+  <script src="js/main.js?v=21"></script>
 </body>
 </html>
