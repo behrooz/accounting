@@ -846,7 +846,13 @@
           ? '<div class="pdp-dots" role="tablist">' + dots + "</div>"
           : "") +
         (images.length > 1
-          ? '<div class="pdp-thumbs" role="list">' + thumbs + "</div>"
+          ? '<div class="pdp-thumbs-wrap">' +
+            '<button type="button" class="pdp-thumbs-nav pdp-thumbs-prev" aria-label="تصاویر قبلی">‹</button>' +
+            '<div class="pdp-thumbs" role="list">' +
+            thumbs +
+            "</div>" +
+            '<button type="button" class="pdp-thumbs-nav pdp-thumbs-next" aria-label="تصاویر بعدی">›</button>' +
+            "</div>"
           : "") +
         "</div>" +
         '<div class="pdp-info">' +
@@ -920,6 +926,21 @@
     });
     $page.find(".pdp-prev").on("click", function () {
       go(index - 1);
+    });
+
+    function scrollThumbs(dir) {
+      var el = $page.find(".pdp-thumbs")[0];
+      if (!el) return;
+      var $thumb = $page.find(".pdp-thumb").first();
+      var step = ($thumb.outerWidth(true) || el.clientWidth * 0.34) * dir;
+      el.scrollBy({ left: step, behavior: "smooth" });
+    }
+
+    $page.find(".pdp-thumbs-prev").on("click", function () {
+      scrollThumbs(1);
+    });
+    $page.find(".pdp-thumbs-next").on("click", function () {
+      scrollThumbs(-1);
     });
     $page.on("click", ".pdp-thumb, .pdp-dot", function () {
       go(Number($(this).data("index")) || 0);
