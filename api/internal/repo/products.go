@@ -60,6 +60,39 @@ type ProductListFilter struct {
 	Offset       int
 }
 
+func CountProducts(db *sqlx.DB, f ProductListFilter) (int, error) {
+	q := `
+		SELECT COUNT(*)
+		FROM products p
+		LEFT JOIN product_categories c ON c.id = p.category_id
+		WHERE 1=1`
+	args := make([]any, 0, 3)
+
+	if id := strings.TrimSpace(f.CategoryID); id != "" {
+		q += " AND p.category_id = ?"
+		args = append(args, id)
+	} else if slug := strings.TrimSpace(f.CategorySlug); slug != "" && slug != "all" {
+		q += " AND c.slug = ?"
+		args = append(args, slug)
+	}
+	if query := strings.TrimSpace(f.Query); query != "" {
+		q += " AND p.name LIKE ?"
+		args = append(args, "%"+query+"%")
+	}
+	if strings.EqualFold(strings.TrimSpace(f.Sort), "sale") {
+		q += ` AND EXISTS (
+			SELECT 1 FROM product_variants v
+			WHERE v.product_id = p.id AND v.sale_price > 0
+		)`
+	}
+
+	var total int
+	if err := db.Get(&total, q, args...); err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
 func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
 	q := `
 		SELECT p.id, p.name, p.category_id

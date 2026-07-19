@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AgGridReact } from "ag-grid-react";
 import {
@@ -11,13 +11,14 @@ import {
   type CellFocusedEvent,
   type CellEditingStoppedEvent,
   type GetRowIdParams,
+  type IDatasource,
   type ICellRendererParams,
   themeQuartz,
 } from "ag-grid-community";
 import {
   cloneProductForCreate,
   deleteProduct,
-  getProducts,
+  getProductsPage,
   saveProducts,
   productPriceRange,
   productTotalStock,
@@ -154,26 +155,56 @@ export default function ProductsGrid() {
   const router = useRouter();
   const gridRef = useRef<GridRef>(null);
   const dataRef = useRef<Product[]>([]);
+  const searchRef = useRef("");
+  const searchMountedRef = useRef(false);
   const lastFocusedRowIdRef = useRef<string | null>(null);
   const cleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [rowData, setRowData] = useState<Product[]>([]);
   const [quickFilter, setQuickFilter] = useState("");
   const [selectedCount, setSelectedCount] = useState(0);
+  const [totalProducts, setTotalProducts] = useState(0);
 
-  useEffect(() => {
-    const load = async () => {
-      const products = await getProducts();
-      dataRef.current = products;
-      setRowData(products);
-    };
-    void load();
-  }, []);
+  const datasource = useMemo<IDatasource>(
+    () => ({
+      getRows: async (params) => {
+        const limit = params.endRow - params.startRow;
+        try {
+          const page = await getProductsPage(
+            limit,
+            params.startRow,
+            searchRef.current,
+          );
+          dataRef.current = page.items;
+          setTotalProducts(page.total);
+          params.successCallback(page.items, page.total);
+        } catch {
+          params.failCallback();
+        }
+      },
+    }),
+    [],
+  );
 
   const commit = useCallback((next: Product[]) => {
     dataRef.current = next;
     void saveProducts(next);
-    setRowData([...next]);
   }, []);
+
+  const refreshGrid = useCallback(() => {
+    setSelectedCount(0);
+    gridRef.current?.api.purgeInfiniteCache();
+  }, []);
+
+  useEffect(() => {
+    if (!searchMountedRef.current) {
+      searchMountedRef.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      searchRef.current = quickFilter.trim();
+      refreshGrid();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [quickFilter, refreshGrid]);
 
   const handleEdit = useCallback(
     (id: string) => router.push(`/products/manage/${id}`),
@@ -188,10 +219,9 @@ export default function ProductsGrid() {
   const handleDelete = useCallback(
     (id: string) => {
       if (!window.confirm("آیا از حذف این محصول مطمئن هستید؟")) return;
-      void deleteProduct(id);
-      commit(dataRef.current.filter((p) => p.id !== id));
+      void deleteProduct(id).then(refreshGrid);
     },
-    [commit],
+    [refreshGrid],
   );
 
   const handleDeleteSelected = useCallback(async () => {
@@ -205,9 +235,8 @@ export default function ProductsGrid() {
     if (!window.confirm(`حذف ${selected.length} محصول انتخاب‌شده؟`)) return;
     const ids = new Set(selected.map((r) => r.id));
     await Promise.all(Array.from(ids).map((id) => deleteProduct(id)));
-    const next = dataRef.current.filter((p) => !ids.has(p.id));
-    commit(next);
-  }, [commit]);
+    refreshGrid();
+  }, [refreshGrid]);
 
   const handleDuplicate = useCallback(
     (product: Product) => {
@@ -249,12 +278,11 @@ export default function ProductsGrid() {
       if (prevId && prevId !== newId) {
         const prev = dataRef.current.find((p) => p.id === prevId);
         if (prev && !prev.name.trim()) {
-          void deleteProduct(prevId);
-          commit(dataRef.current.filter((p) => p.id !== prevId));
+          void deleteProduct(prevId).then(refreshGrid);
         }
       }
     },
-    [commit],
+    [refreshGrid],
   );
 
   const onCellEditingStopped = useCallback(
@@ -266,12 +294,11 @@ export default function ProductsGrid() {
         cleanupTimerRef.current = null;
         const p = dataRef.current.find((x) => x.id === id);
         if (p && !p.name.trim()) {
-          void deleteProduct(id);
-          commit(dataRef.current.filter((x) => x.id !== id));
+          void deleteProduct(id).then(refreshGrid);
         }
       }, 200);
     },
-    [commit],
+    [refreshGrid],
   );
 
   const handleExport = useCallback(
@@ -337,7 +364,10 @@ export default function ProductsGrid() {
         <AgGridReact<Product>
           ref={gridRef}
           theme={gridTheme}
-          rowData={rowData}
+          rowModelType="infinite"
+          datasource={datasource}
+          cacheBlockSize={10}
+          maxBlocksInCache={2}
           columnDefs={COLUMN_DEFS}
           defaultColDef={DEFAULT_COL_DEF}
           getRowId={getRowId}
@@ -346,11 +376,10 @@ export default function ProductsGrid() {
           onCellEditingStopped={onCellEditingStopped}
           rowSelection="multiple"
           onSelectionChanged={onSelectionChanged}
-          quickFilterText={quickFilter}
           enableRtl={true}
           pagination={true}
-          paginationPageSize={15}
-          paginationPageSizeSelector={[10, 15, 25, 50]}
+          paginationPageSize={10}
+          paginationPageSizeSelector={false}
           animateRows={true}
           context={gridCtx}
           noRowsOverlayComponent={NoRowsOverlay}
@@ -358,7 +387,7 @@ export default function ProductsGrid() {
       </div>
 
       <p className="text-xs text-[#879596]">
-        {rowData.length} محصول ثبت‌شده
+        {totalProducts.toLocaleString("fa-IR")} محصول ثبت‌شده
         {selectedCount > 0 && ` · ${selectedCount} انتخاب‌شده`}
       </p>
     </div>

@@ -173,6 +173,27 @@ export const getProducts = async (): Promise<Product[]> => {
   }
 };
 
+export type ProductPage = {
+  items: Product[];
+  total: number;
+  pageSize: number;
+  offset: number;
+};
+
+export const getProductsPage = async (
+  limit: number,
+  offset: number,
+  query = "",
+): Promise<ProductPage> => {
+  const params = new URLSearchParams({
+    includeTotal: "true",
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (query.trim()) params.set("q", query.trim());
+  return apiRequest<ProductPage>(`/products?${params.toString()}`);
+};
+
 export const saveProducts = async (products: Product[]): Promise<void> => {
   try {
     await Promise.all(

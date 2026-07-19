@@ -148,6 +148,13 @@ func main() {
 	api.GET("/products", func(c *gin.Context) {
 		limit, _ := strconv.Atoi(c.Query("limit"))
 		offset, _ := strconv.Atoi(c.Query("offset"))
+		includeTotal := strings.EqualFold(c.Query("includeTotal"), "true")
+		if includeTotal && limit <= 0 {
+			limit = 10
+		}
+		if limit > 100 {
+			limit = 100
+		}
 		filter := repo.ProductListFilter{
 			Sort:         c.Query("sort"),
 			CategoryID:   c.Query("categoryId"),
@@ -159,6 +166,20 @@ func main() {
 		ps, err := repo.ListProducts(database, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		if includeTotal {
+			total, err := repo.CountProducts(database, filter)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"items":    ps,
+				"total":    total,
+				"pageSize": limit,
+				"offset":   offset,
+			})
 			return
 		}
 		c.JSON(http.StatusOK, ps)
