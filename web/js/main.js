@@ -291,43 +291,29 @@
     );
   }
 
+  var PRODUCT_PAGE_SIZE = 10;
+  var productPaging = {
+    context: "",
+    offset: 0,
+    loading: false,
+    hasMore: true,
+    requestSerial: 0
+  };
+
   function loadProducts() {
-    var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
     var $home = $("#homeProducts");
     var onProductPage = $("#productPage").length > 0;
     var onShopPage = $("#shopProducts").length > 0;
 
     if (onShopPage) {
-      return loadShopProducts();
+      return loadShopProducts(true);
     }
 
-    if ($home.length) {
-      $home.html('<p class="cat-loading">در حال بارگذاری محصولات...</p>');
-    }
-    // Product detail: fetch that id directly (new tab / deep link)
     if (onProductPage) {
-      loadProductDetail();
+      return loadProductDetail();
     }
-    return $.ajax({
-      url: base + "/products",
-      method: "GET",
-      dataType: "json"
-    })
-      .done(function (rows) {
-        var list = (Array.isArray(rows) ? rows : []).map(mapApiProduct);
-        window.ABERANG_PRODUCTS = list;
-        renderHome();
-        if (!onProductPage) renderProductPage();
-      })
-      .fail(function () {
-        window.ABERANG_PRODUCTS = [];
-        if ($home.length) {
-          $home.html(
-            '<p class="cat-loading">دریافت محصولات ناموفق بود. API را بررسی کنید.</p>'
-          );
-        }
-        if (!onProductPage) renderProductPage();
-      });
+
+    if ($home.length) return fetchProductBatch("home", true);
   }
 
   function shopListParams() {
@@ -366,9 +352,11 @@
     if (total === 0) {
       $("#shopResultCount").text("۰ نتیجه");
     } else {
-      $("#shopResultCount").text(
-        "نمایش " + faNum(1) + "–" + faNum(total) + " از " + faNum(total) + " نتیجه"
-      );
+      var resultText = "نمایش " + faNum(1) + "–" + faNum(total);
+      if (!productPaging.hasMore) {
+        resultText += " از " + faNum(total);
+      }
+      $("#shopResultCount").text(resultText + " نتیجه");
     }
 
     $(".shop-sort-option").removeClass("is-active");
@@ -433,7 +421,92 @@
     loadShopProducts();
   }
 
-  function loadShopProducts() {
+  function productBatchData(context, offset) {
+    var data = { limit: PRODUCT_PAGE_SIZE, offset: offset };
+    if (context !== "shop") return data;
+
+    var params = shopListParams();
+    data.sort = params.sort || "new";
+    if (params.categoryId) data.categoryId = params.categoryId;
+    if (params.cat && params.cat !== "all") data.cat = params.cat;
+    if (params.q) data.q = params.q;
+    return data;
+  }
+
+  function fetchProductBatch(context, reset) {
+    if (!reset && (productPaging.loading || !productPaging.hasMore)) return;
+
+    if (reset) {
+      productPaging.context = context;
+      productPaging.offset = 0;
+      productPaging.hasMore = true;
+      window.ABERANG_PRODUCTS = [];
+    }
+
+    var serial = ++productPaging.requestSerial;
+    var offset = reset ? 0 : productPaging.offset;
+    productPaging.loading = true;
+
+    var $grid = context === "shop" ? $("#shopProducts") : $("#homeProducts");
+    if (reset) {
+      $grid.html('<p class="cat-loading">در حال بارگذاری محصولات...</p>');
+      if (context === "shop") {
+        $("#shopEmpty").prop("hidden", true);
+        $("#shopResultCount").text("در حال بارگذاری…");
+      }
+    }
+
+    var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
+    return $.ajax({
+      url: base + "/products",
+      method: "GET",
+      data: productBatchData(context, offset),
+      dataType: "json"
+    })
+      .done(function (rows) {
+        if (serial !== productPaging.requestSerial) return;
+        var batch = (Array.isArray(rows) ? rows : []).map(mapApiProduct);
+        var current = reset ? [] : getProducts().slice();
+        var known = {};
+        current.forEach(function (p) {
+          known[p.id] = true;
+        });
+        batch.forEach(function (p) {
+          if (!known[p.id]) {
+            known[p.id] = true;
+            current.push(p);
+          }
+        });
+        window.ABERANG_PRODUCTS = current;
+        productPaging.offset = offset + batch.length;
+        productPaging.hasMore = batch.length === PRODUCT_PAGE_SIZE;
+
+        if (context === "shop") renderShop();
+        else renderHome();
+      })
+      .fail(function () {
+        if (serial !== productPaging.requestSerial) return;
+        if (reset) {
+          window.ABERANG_PRODUCTS = [];
+          $grid.empty();
+          if (context === "shop") {
+            $("#shopEmpty").prop("hidden", false).text("دریافت محصولات ناموفق بود.");
+            $("#shopResultCount").text("۰ نتیجه");
+          } else {
+            $grid.html(
+              '<p class="cat-loading">دریافت محصولات ناموفق بود. API را بررسی کنید.</p>'
+            );
+          }
+        }
+      })
+      .always(function () {
+        if (serial === productPaging.requestSerial) {
+          productPaging.loading = false;
+        }
+      });
+  }
+
+  function loadShopProducts(reset) {
     var $grid = $("#shopProducts");
     if (!$grid.length) return;
 
@@ -443,34 +516,7 @@
     var q = params.q;
     if (q) $("#shopSearchInput").val(q);
 
-    updateShopMeta([]);
-    $grid.html('<p class="cat-loading">در حال بارگذاری محصولات...</p>');
-    $("#shopEmpty").prop("hidden", true);
-    $("#shopResultCount").text("در حال بارگذاری…");
-
-    var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
-    var data = { sort: params.sort || "new" };
-    if (params.categoryId) data.categoryId = params.categoryId;
-    if (params.cat && params.cat !== "all") data.cat = params.cat;
-    if (params.q) data.q = params.q;
-
-    return $.ajax({
-      url: base + "/products",
-      method: "GET",
-      data: data,
-      dataType: "json"
-    })
-      .done(function (rows) {
-        var list = (Array.isArray(rows) ? rows : []).map(mapApiProduct);
-        window.ABERANG_PRODUCTS = list;
-        renderShop();
-      })
-      .fail(function () {
-        window.ABERANG_PRODUCTS = [];
-        $grid.empty();
-        $("#shopEmpty").prop("hidden", false).text("دریافت محصولات ناموفق بود.");
-        $("#shopResultCount").text("۰ نتیجه");
-      });
+    return fetchProductBatch("shop", reset !== false);
   }
 
   function loadProductDetail() {
@@ -591,7 +637,6 @@
     }
     $grid.html(
       list
-        .slice(0, 8)
         .map(productCard)
         .join("")
     );
@@ -1360,6 +1405,17 @@
     renderCart();
     loadCategories();
     loadProducts();
+
+    $(window).off("scroll.products").on("scroll.products", function () {
+      if (!productPaging.context || productPaging.loading || !productPaging.hasMore) {
+        return;
+      }
+      var viewportBottom = $(window).scrollTop() + $(window).height();
+      var loadAt = $(document).height() - 500;
+      if (viewportBottom >= loadAt) {
+        fetchProductBatch(productPaging.context, false);
+      }
+    });
 
     $("#menuToggle, #dockMenu").on("click", toggleMenu);
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -139,17 +140,21 @@ func main() {
 		}
 		c.JSON(http.StatusOK, gin.H{
 			"token": token,
-			"user": gin.H{"id": u.ID, "fullName": u.FullName, "username": u.Username, "role": u.Role},
+			"user":  gin.H{"id": u.ID, "fullName": u.FullName, "username": u.Username, "role": u.Role},
 		})
 	})
 
 	// ── Storefront public (no JWT) — catalog + checkout + phone-based addresses ──
 	api.GET("/products", func(c *gin.Context) {
+		limit, _ := strconv.Atoi(c.Query("limit"))
+		offset, _ := strconv.Atoi(c.Query("offset"))
 		filter := repo.ProductListFilter{
 			Sort:         c.Query("sort"),
 			CategoryID:   c.Query("categoryId"),
 			CategorySlug: c.Query("cat"),
 			Query:        c.Query("q"),
+			Limit:        limit,
+			Offset:       offset,
 		}
 		ps, err := repo.ListProducts(database, filter)
 		if err != nil {
@@ -908,27 +913,27 @@ func main() {
 		}
 
 		type variantRow struct {
-			ID        string `json:"id"`
-			AttrLabel string `json:"attrLabel"`
-			SKU       string `json:"sku"`
-			Quantity  int    `json:"quantity"`
-			UnitCost  int64  `json:"unitCost"`
-			UnitSale  int64  `json:"unitSale"`
-			TotalCost int64  `json:"totalCost"`
-			TotalSale int64  `json:"totalSale"`
-			Profit    int64  `json:"profit"`
+			ID        string   `json:"id"`
+			AttrLabel string   `json:"attrLabel"`
+			SKU       string   `json:"sku"`
+			Quantity  int      `json:"quantity"`
+			UnitCost  int64    `json:"unitCost"`
+			UnitSale  int64    `json:"unitSale"`
+			TotalCost int64    `json:"totalCost"`
+			TotalSale int64    `json:"totalSale"`
+			Profit    int64    `json:"profit"`
 			Margin    *float64 `json:"margin"`
 		}
 		type productRow struct {
-			ID          string       `json:"id"`
-			Name        string       `json:"name"`
-			VariantCount int         `json:"variantCount"`
-			TotalStock  int          `json:"totalStock"`
-			TotalCost   int64        `json:"totalCost"`
-			TotalSale   int64        `json:"totalSale"`
-			Profit      int64        `json:"profit"`
-			Margin      *float64     `json:"margin"`
-			Variants    []variantRow `json:"variants"`
+			ID           string       `json:"id"`
+			Name         string       `json:"name"`
+			VariantCount int          `json:"variantCount"`
+			TotalStock   int          `json:"totalStock"`
+			TotalCost    int64        `json:"totalCost"`
+			TotalSale    int64        `json:"totalSale"`
+			Profit       int64        `json:"profit"`
+			Margin       *float64     `json:"margin"`
+			Variants     []variantRow `json:"variants"`
 		}
 
 		rows := make([]productRow, 0, len(ps))

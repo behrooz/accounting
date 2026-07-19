@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	"accounting-api/internal/media"
@@ -57,6 +56,8 @@ type ProductListFilter struct {
 	CategoryID   string
 	CategorySlug string
 	Query        string
+	Limit        int
+	Offset       int
 }
 
 func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
@@ -90,8 +91,30 @@ func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
 		)`
 	}
 
-	// ID order for "new"; price sorts applied after loading full products.
-	q += " ORDER BY p.updated_at DESC"
+	effectivePrice := `COALESCE((
+		SELECT MIN(CASE WHEN v.sale_price > 0 THEN v.sale_price ELSE v.price END)
+		FROM product_variants v
+		WHERE v.product_id = p.id AND (v.sale_price > 0 OR v.price > 0)
+	), 0)`
+	switch sortKey {
+	case "price-asc", "sale":
+		q += " ORDER BY " + effectivePrice + " ASC, p.updated_at DESC, p.id DESC"
+	case "price-desc":
+		q += " ORDER BY " + effectivePrice + " DESC, p.updated_at DESC, p.id DESC"
+	default:
+		q += " ORDER BY p.updated_at DESC, p.id DESC"
+	}
+
+	if f.Limit > 0 {
+		if f.Limit > 100 {
+			f.Limit = 100
+		}
+		if f.Offset < 0 {
+			f.Offset = 0
+		}
+		q += " LIMIT ? OFFSET ?"
+		args = append(args, f.Limit, f.Offset)
+	}
 
 	var ps []productRow
 	if err := db.Select(&ps, q, args...); err != nil {
@@ -104,21 +127,6 @@ func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
 			return nil, err
 		}
 		out = append(out, *full)
-	}
-
-	switch sortKey {
-	case "price-asc":
-		sort.SliceStable(out, func(i, j int) bool {
-			return productListPrice(out[i]) < productListPrice(out[j])
-		})
-	case "price-desc":
-		sort.SliceStable(out, func(i, j int) bool {
-			return productListPrice(out[i]) > productListPrice(out[j])
-		})
-	case "sale":
-		sort.SliceStable(out, func(i, j int) bool {
-			return productListPrice(out[i]) < productListPrice(out[j])
-		})
 	}
 
 	return out, nil
@@ -422,10 +430,10 @@ func DeleteProduct(db *sqlx.DB, id string) error {
 
 // ProductStock is a lightweight stock payload for the storefront.
 type ProductStock struct {
-	ProductID     string             `json:"productId"`
-	TotalQuantity int                `json:"totalQuantity"`
-	Variants      []VariantStock     `json:"variants"`
-	Options       []OptionStock      `json:"options"`
+	ProductID     string         `json:"productId"`
+	TotalQuantity int            `json:"totalQuantity"`
+	Variants      []VariantStock `json:"variants"`
+	Options       []OptionStock  `json:"options"`
 }
 
 type VariantStock struct {
