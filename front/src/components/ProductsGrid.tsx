@@ -24,6 +24,10 @@ import {
   productTotalStock,
   type Product,
 } from "@/lib/products";
+import {
+  getCategories,
+  type ProductCategory,
+} from "@/lib/categories";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -156,10 +160,15 @@ export default function ProductsGrid() {
   const gridRef = useRef<GridRef>(null);
   const dataRef = useRef<Product[]>([]);
   const searchRef = useRef("");
+  const categoryRef = useRef("");
+  const specificationRef = useRef("");
   const searchMountedRef = useRef(false);
   const lastFocusedRowIdRef = useRef<string | null>(null);
   const cleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [quickFilter, setQuickFilter] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [specificationFilter, setSpecificationFilter] = useState("");
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [selectedCount, setSelectedCount] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
 
@@ -172,6 +181,8 @@ export default function ProductsGrid() {
             limit,
             params.startRow,
             searchRef.current,
+            categoryRef.current,
+            specificationRef.current,
           );
           dataRef.current = page.items;
           setTotalProducts(page.total);
@@ -195,16 +206,22 @@ export default function ProductsGrid() {
   }, []);
 
   useEffect(() => {
+    void getCategories().then(setCategories);
+  }, []);
+
+  useEffect(() => {
     if (!searchMountedRef.current) {
       searchMountedRef.current = true;
       return;
     }
     const timer = setTimeout(() => {
       searchRef.current = quickFilter.trim();
+      categoryRef.current = categoryId;
+      specificationRef.current = specificationFilter.trim();
       refreshGrid();
     }, 300);
     return () => clearTimeout(timer);
-  }, [quickFilter, refreshGrid]);
+  }, [quickFilter, categoryId, specificationFilter, refreshGrid]);
 
   const handleEdit = useCallback(
     (id: string) => router.push(`/products/manage/${id}`),
@@ -327,10 +344,30 @@ export default function ProductsGrid() {
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="search"
-            placeholder="جستجو…"
+            placeholder="نام محصول…"
             value={quickFilter}
             onChange={(e) => setQuickFilter(e.target.value)}
             className="w-44 rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm text-[#16191f] placeholder:text-[#879596] outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]"
+          />
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            aria-label="فیلتر دسته‌بندی"
+            className="w-44 rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm text-[#16191f] outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]"
+          >
+            <option value="">همه دسته‌بندی‌ها</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="search"
+            placeholder="ویژگی یا مشخصات…"
+            value={specificationFilter}
+            onChange={(e) => setSpecificationFilter(e.target.value)}
+            className="w-48 rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm text-[#16191f] placeholder:text-[#879596] outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]"
           />
           <button
             onClick={handleNewProduct}

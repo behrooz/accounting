@@ -156,12 +156,13 @@ func main() {
 			limit = 100
 		}
 		filter := repo.ProductListFilter{
-			Sort:         c.Query("sort"),
-			CategoryID:   c.Query("categoryId"),
-			CategorySlug: c.Query("cat"),
-			Query:        c.Query("q"),
-			Limit:        limit,
-			Offset:       offset,
+			Sort:          c.Query("sort"),
+			CategoryID:    c.Query("categoryId"),
+			CategorySlug:  c.Query("cat"),
+			Query:         c.Query("q"),
+			Specification: c.Query("spec"),
+			Limit:         limit,
+			Offset:        offset,
 		}
 		ps, err := repo.ListProducts(database, filter)
 		if err != nil {

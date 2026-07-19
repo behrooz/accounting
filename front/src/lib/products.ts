@@ -184,6 +184,8 @@ export const getProductsPage = async (
   limit: number,
   offset: number,
   query = "",
+  categoryId = "",
+  specification = "",
 ): Promise<ProductPage> => {
   const params = new URLSearchParams({
     includeTotal: "true",
@@ -191,6 +193,8 @@ export const getProductsPage = async (
     offset: String(offset),
   });
   if (query.trim()) params.set("q", query.trim());
+  if (categoryId) params.set("categoryId", categoryId);
+  if (specification.trim()) params.set("spec", specification.trim());
   return apiRequest<ProductPage>(`/products?${params.toString()}`);
 };
 

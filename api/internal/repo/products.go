@@ -52,12 +52,13 @@ type varRow struct {
 }
 
 type ProductListFilter struct {
-	Sort         string // new | price-asc | price-desc | sale
-	CategoryID   string
-	CategorySlug string
-	Query        string
-	Limit        int
-	Offset       int
+	Sort          string // new | price-asc | price-desc | sale
+	CategoryID    string
+	CategorySlug  string
+	Query         string
+	Specification string
+	Limit         int
+	Offset        int
 }
 
 func CountProducts(db *sqlx.DB, f ProductListFilter) (int, error) {
@@ -78,6 +79,17 @@ func CountProducts(db *sqlx.DB, f ProductListFilter) (int, error) {
 	if query := strings.TrimSpace(f.Query); query != "" {
 		q += " AND p.name LIKE ?"
 		args = append(args, "%"+query+"%")
+	}
+	if specification := strings.TrimSpace(f.Specification); specification != "" {
+		q += ` AND EXISTS (
+			SELECT 1
+			FROM product_attributes pa
+			LEFT JOIN attribute_options ao ON ao.attribute_id = pa.id
+			WHERE pa.product_id = p.id
+			  AND (pa.name LIKE ? OR ao.label LIKE ?)
+		)`
+		like := "%" + specification + "%"
+		args = append(args, like, like)
 	}
 	if strings.EqualFold(strings.TrimSpace(f.Sort), "sale") {
 		q += ` AND EXISTS (
@@ -111,6 +123,17 @@ func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
 	if query := strings.TrimSpace(f.Query); query != "" {
 		q += " AND p.name LIKE ?"
 		args = append(args, "%"+query+"%")
+	}
+	if specification := strings.TrimSpace(f.Specification); specification != "" {
+		q += ` AND EXISTS (
+			SELECT 1
+			FROM product_attributes pa
+			LEFT JOIN attribute_options ao ON ao.attribute_id = pa.id
+			WHERE pa.product_id = p.id
+			  AND (pa.name LIKE ? OR ao.label LIKE ?)
+		)`
+		like := "%" + specification + "%"
+		args = append(args, like, like)
 	}
 
 	sortKey := strings.TrimSpace(strings.ToLower(f.Sort))
