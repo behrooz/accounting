@@ -56,6 +56,13 @@ spec:
           value: {{ .value | quote }}
         {{- end }}
         {{- end }}
+        {{- if .Values.cursor.enabled }}
+        - name: CURSOR_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.cursor.secretName | quote }}
+              key: {{ .Values.cursor.secretKey | quote }}
+        {{- end }}
         {{- if and .Values.probes .Values.probes.enabled .Values.livenessProbe }}
         livenessProbe:
           {{- toYaml .Values.livenessProbe | nindent 10 }}

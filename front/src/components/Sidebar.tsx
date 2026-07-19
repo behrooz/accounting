@@ -12,6 +12,10 @@ const NAV = [
       { label: "داشبورد", href: "/dashboard" },
       { label: "فروشگاه", href: "/shop" },
       { label: "مدیریت محصولات", href: "/products/manage" },
+      {
+        label: "افزودن محصول با دستیار",
+        href: "/products/manage/new#product-assistant",
+      },
       { label: "کاربران", href: "/users" },
       { label: "سود و زیان", href: "/profit-loss" },
       { label: "هزینه‌ها", href: "/expenses" },

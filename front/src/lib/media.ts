@@ -60,36 +60,3 @@ export async function uploadProductImage(file: File): Promise<UploadedImage> {
 
   return (await res.json()) as UploadedImage;
 }
-
-/** Optional client-side compress before upload (returns a JPEG File). */
-export async function compressImageFile(
-  file: File,
-  maxPx = 1280,
-  quality = 0.85,
-): Promise<File> {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("read failed"));
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("image decode failed"));
-      img.onload = () => {
-        const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * ratio);
-        canvas.height = Math.round(img.height * ratio);
-        canvas
-          .getContext("2d")!
-          .drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.src = e.target!.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  const name = file.name.replace(/\.\w+$/, "") + ".jpg";
-  return new File([blob], name, { type: "image/jpeg" });
-}

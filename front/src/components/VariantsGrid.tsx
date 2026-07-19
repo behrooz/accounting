@@ -16,7 +16,7 @@ import {
   themeQuartz,
 } from "ag-grid-community";
 import type { ProductAttribute, ProductVariant } from "@/lib/products";
-import { compressImageFile, mediaUrl, uploadProductImage } from "@/lib/media";
+import { mediaUrl, uploadProductImage } from "@/lib/media";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -65,13 +65,10 @@ const ImageCellRenderer = ({ data, context }: ICellRendererParams) => {
       const file = input.files?.[0];
       if (!file) return;
       try {
-        const compressed = await compressImageFile(file, 640);
-        const uploaded = await uploadProductImage(compressed);
+        const uploaded = await uploadProductImage(file);
         ctx.handleImageChange(v.id, uploaded.path);
       } catch (err) {
-        alert(
-          err instanceof Error ? err.message : "آپلود تصویر ناموفق بود.",
-        );
+        alert(err instanceof Error ? err.message : "آپلود تصویر ناموفق بود.");
       }
     };
     input.click();
@@ -221,7 +218,9 @@ export default function VariantsGrid({
     (field: ApplyField) => {
       const val = lastFieldValuesRef.current[field];
       if (val === undefined) {
-        alert("ابتدا یک مقدار در این ستون وارد کنید، بعد «اعمال برای همه» را بزنید.");
+        alert(
+          "ابتدا یک مقدار در این ستون وارد کنید، بعد «اعمال برای همه» را بزنید.",
+        );
         return;
       }
       if (!dataRef.current.length) return;
@@ -420,8 +419,7 @@ export default function VariantsGrid({
         e.rowIndex !== null && e.rowIndex !== undefined
           ? ((
               api.getDisplayedRowAtIndex(e.rowIndex)?.data as
-                | ProductVariant
-                | undefined
+                ProductVariant | undefined
             )?.id ?? null)
           : null;
       const prevId = lastFocusedRowIdRef.current;

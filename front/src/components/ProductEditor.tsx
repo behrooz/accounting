@@ -10,15 +10,12 @@ import {
   type ProductAttribute,
   type ProductVariant,
 } from "@/lib/products";
+import { getCategories, type ProductCategory } from "@/lib/categories";
+import { mediaUrl, uploadProductImage } from "@/lib/media";
 import {
-  getCategories,
-  type ProductCategory,
-} from "@/lib/categories";
-import {
-  compressImageFile,
-  mediaUrl,
-  uploadProductImage,
-} from "@/lib/media";
+  generateProductDraft,
+  type ProductAssistantDraft,
+} from "@/lib/productAssistant";
 import VariantsGrid from "./VariantsGrid";
 
 /** Repair variants whose attributeValues are empty/stale but attributes have options. */
@@ -80,6 +77,78 @@ function repairProductVariants(product: Product): Product {
   };
 }
 
+function normalizeLabel(value: string): string {
+  return value.replace(/[\s\u200c_-]+/g, "").toLocaleLowerCase("fa-IR");
+}
+
+function findAssistantCategory(
+  suggestedName: string,
+  categories: ProductCategory[],
+): ProductCategory | undefined {
+  const categoryName = normalizeLabel(suggestedName);
+  return categories.find((item) => {
+    const name = normalizeLabel(item.name);
+    const slug = normalizeLabel(item.slug);
+    return (
+      !!categoryName &&
+      (name === categoryName ||
+        slug === categoryName ||
+        name.includes(categoryName) ||
+        categoryName.includes(name))
+    );
+  });
+}
+
+function applyAssistantDraft(
+  current: Product,
+  draft: ProductAssistantDraft,
+  categories: ProductCategory[],
+): Product {
+  const attributes: ProductAttribute[] = draft.attributes.map((attribute) => ({
+    id: crypto.randomUUID(),
+    name: attribute.name,
+    allowImage: attribute.allowImage,
+    options: attribute.options.map((label) => ({
+      id: crypto.randomUUID(),
+      label,
+    })),
+  }));
+  const combinations = generateVariantCombinations(attributes);
+  const category = findAssistantCategory(draft.categoryName, categories);
+
+  const variants: ProductVariant[] = combinations.map((combination, index) => {
+    const labelsByName: Record<string, string> = {};
+    for (const attribute of attributes) {
+      const value = combination[attribute.id];
+      if (value) labelsByName[attribute.name] = value;
+    }
+    const override = draft.variants.find((variant) =>
+      Object.entries(labelsByName).every(
+        ([name, value]) => variant.attributeValues[name] === value,
+      ),
+    );
+    const skuPrefix = draft.defaults.skuPrefix.trim();
+    return {
+      id: crypto.randomUUID(),
+      sku:
+        override?.sku ||
+        (skuPrefix ? `${skuPrefix}-${String(index + 1).padStart(2, "0")}` : ""),
+      price: override?.purchasePrice ?? draft.defaults.purchasePrice,
+      salePrice: override?.salePrice ?? draft.defaults.salePrice,
+      quantity: override?.quantity ?? draft.defaults.quantity,
+      attributeValues: combination,
+    };
+  });
+
+  return {
+    ...current,
+    name: draft.name,
+    categoryId: category?.id ?? current.categoryId ?? null,
+    attributes,
+    variants,
+  };
+}
+
 /* ─── Small inline helper: tag-style option input ───────────────────────── */
 function AddOptionInput({ onAdd }: { onAdd: (label: string) => void }) {
   const [value, setValue] = useState("");
@@ -126,11 +195,24 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
   });
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [assistantDescription, setAssistantDescription] = useState("");
+  const [generatingDraft, setGeneratingDraft] = useState(false);
+  const [assistantError, setAssistantError] = useState("");
+  const [assistantMessage, setAssistantMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void getCategories().then(setCategories);
   }, []);
+
+  useEffect(() => {
+    if (!isNew || window.location.hash !== "#product-assistant") return;
+    requestAnimationFrame(() => {
+      document
+        .getElementById("product-assistant")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [isNew]);
 
   const syncVariants = useCallback(
     (attrs: ProductAttribute[], current: ProductVariant[]): ProductVariant[] =>
@@ -147,6 +229,41 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
       categoryId: categoryId || null,
     }));
 
+  const handleGenerateDraft = async () => {
+    const description = assistantDescription.trim();
+    if (description.length < 10) {
+      setAssistantError("توضیحات محصول را کامل‌تر وارد کنید.");
+      return;
+    }
+    setGeneratingDraft(true);
+    setAssistantError("");
+    setAssistantMessage("");
+    try {
+      const [draft, availableCategories] = await Promise.all([
+        generateProductDraft(description),
+        categories.length ? Promise.resolve(categories) : getCategories(),
+      ]);
+      if (!categories.length) setCategories(availableCategories);
+      setProduct((current) =>
+        applyAssistantDraft(current, draft, availableCategories),
+      );
+      setAssistantMessage(
+        draft.categoryName &&
+          !findAssistantCategory(draft.categoryName, availableCategories)
+          ? `پیش‌نویس ساخته شد، اما دسته «${draft.categoryName}» در فهرست موجود نیست؛ دسته را دستی انتخاب کنید.`
+          : "پیش‌نویس ساخته شد. همه فیلدها و ترکیب‌ها را بررسی و سپس ذخیره کنید.",
+      );
+    } catch (error) {
+      setAssistantError(
+        error instanceof Error
+          ? error.message
+          : "ساخت پیش‌نویس محصول ناموفق بود.",
+      );
+    } finally {
+      setGeneratingDraft(false);
+    }
+  };
+
   const handleBulkImages = async (files: FileList | null) => {
     if (!files?.length) return;
     setUploadingImages(true);
@@ -154,8 +271,7 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
       const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
       const paths: string[] = [];
       for (const file of list) {
-        const compressed = await compressImageFile(file, 1280);
-        const uploaded = await uploadProductImage(compressed);
+        const uploaded = await uploadProductImage(file);
         paths.push(uploaded.path);
       }
       setProduct((p) => ({
@@ -330,6 +446,56 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
         </div>
       </div>
 
+      {isNew && (
+        <section
+          id="product-assistant"
+          className="rounded border border-[#7aa7c7] bg-[#f5faff] shadow-sm"
+        >
+          <div className="border-b border-[#b8d4e8] px-5 py-3">
+            <h2 className="text-sm font-semibold text-[#16191f]">
+              دستیار ساخت محصول
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-[#545b64]">
+              توضیحات را آزاد بنویسید تا عنوان، دسته، ویژگی‌ها، ترکیب‌ها، قیمت و
+              موجودی به‌صورت پیش‌نویس تکمیل شوند. تصاویر فقط با همان فایل اصلی
+              آپلود می‌شوند و برای Cursor ارسال یا تحلیل نمی‌شوند.
+            </p>
+          </div>
+          <div className="space-y-3 p-5">
+            <textarea
+              value={assistantDescription}
+              onChange={(event) => setAssistantDescription(event.target.value)}
+              rows={7}
+              placeholder="مثال: تیشرت آوا، دسته تیشرت، جنس نخ پنبه، سایز ۳۶ تا ۴۴، رنگ‌های سفید و مشکی و صورتی، قیمت خرید ۴۵۰۰۰۰، قیمت فروش ۶۹۸۰۰۰، موجودی هر رنگ ۱۰ عدد..."
+              className="w-full resize-y rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm leading-7 text-[#16191f] placeholder:text-[#879596] outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]"
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={generatingDraft}
+                onClick={() => void handleGenerateDraft()}
+                className="rounded bg-[#0073bb] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#005f99] disabled:cursor-wait disabled:opacity-60"
+              >
+                {generatingDraft ? "در حال ساخت پیش‌نویس…" : "ساخت پیش‌نویس"}
+              </button>
+              <span className="text-xs text-[#545b64]">
+                هیچ محصولی بدون بررسی و زدن «ذخیره محصول» ثبت نمی‌شود.
+              </span>
+            </div>
+            {assistantError && (
+              <p className="rounded border border-[#f1b5a9] bg-[#fdf3f1] px-3 py-2 text-sm text-[#b12704]">
+                {assistantError}
+              </p>
+            )}
+            {assistantMessage && (
+              <p className="rounded border border-[#82c6a3] bg-[#f2fbf6] px-3 py-2 text-sm text-[#1d6f42]">
+                {assistantMessage}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+
       <section className="rounded border border-[#d5dbdb] bg-white shadow-sm">
         <div className="border-b border-[#d5dbdb] bg-[#f2f3f3] px-5 py-3">
           <h2 className="text-sm font-semibold text-[#16191f]">
@@ -347,7 +513,9 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-[#545b64]">دسته‌بندی</span>
+            <span className="text-xs font-medium text-[#545b64]">
+              دسته‌بندی
+            </span>
             <select
               value={product.categoryId ?? ""}
               onChange={(e) => handleCategoryChange(e.target.value)}

@@ -105,6 +105,13 @@ env:
   - name: NEXT_TELEMETRY_DISABLED
     value: "1"
 
+# Cursor SDK product assistant. The API key must be provided by an existing
+# Kubernetes Secret; it is never stored in chart values or exposed publicly.
+cursor:
+  enabled: false
+  secretName: accounting-front-cursor
+  secretKey: CURSOR_API_KEY
+
 # ConfigMap for additional configuration
 configMap:
   enabled: false
