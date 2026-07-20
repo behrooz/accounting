@@ -30,11 +30,15 @@ RUN printf '%s\n' \
   && chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /tmp /etc/nginx/conf.d
 
 WORKDIR /usr/share/nginx/html
-COPY --chown=nginx:nginx index.html shop.html product.html checkout.html account.html ./
+COPY --chown=nginx:nginx \
+  index.html shop.html product.html checkout.html account.html \
+  about.html contact.html terms.html privacy.html shipping.html returns.html \
+  robots.txt sitemap.xml ./
 COPY --chown=nginx:nginx css ./css
 COPY --chown=nginx:nginx js ./js
 
 ENV ABERANG_API_BASE_URL=https://ns-xp45-default-accounting-api.bugx.ir/api
+ENV ABERANG_SITE_ORIGIN=https://abrangstyle.ir
 
 USER nginx
 EXPOSE 8080

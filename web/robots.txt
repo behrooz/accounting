@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+Allow: /shop.html
+Allow: /product.html
+Allow: /about.html
+Allow: /contact.html
+Allow: /terms.html
+Allow: /privacy.html
+Allow: /shipping.html
+Allow: /returns.html
+Disallow: /account.html
+Disallow: /checkout.html
+Disallow: /js/
+Disallow: /css/
+
+Sitemap: https://abrangstyle.ir/sitemap.xml

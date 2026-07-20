@@ -267,44 +267,161 @@
     return "product.html?id=" + encodeURIComponent(id);
   }
 
+  function siteOrigin() {
+    return String(window.ABERANG_SITE_ORIGIN || "https://abrangstyle.ir").replace(
+      /\/$/,
+      "",
+    );
+  }
+
+  function absoluteUrl(path) {
+    if (!path) return siteOrigin() + "/";
+    var s = String(path);
+    if (
+      s.indexOf("http://") === 0 ||
+      s.indexOf("https://") === 0 ||
+      s.indexOf("data:") === 0
+    ) {
+      return s;
+    }
+    if (s.charAt(0) !== "/") s = "/" + s;
+    return siteOrigin() + s;
+  }
+
+  function ensureMetaByAttr(attr, key, content) {
+    var sel = 'meta[' + attr + '="' + key + '"]';
+    var el = document.querySelector(sel);
+    if (!el) {
+      el = document.createElement("meta");
+      el.setAttribute(attr, key);
+      document.head.appendChild(el);
+    }
+    el.setAttribute("content", content || "");
+  }
+
+  function ensureCanonical(href) {
+    var el = document.querySelector('link[rel="canonical"]');
+    if (!el) {
+      el = document.createElement("link");
+      el.setAttribute("rel", "canonical");
+      document.head.appendChild(el);
+    }
+    el.setAttribute("href", href);
+  }
+
+  function setPageSeo(opts) {
+    opts = opts || {};
+    if (opts.title) document.title = opts.title;
+    if (opts.description) {
+      ensureMetaByAttr("name", "description", opts.description);
+      ensureMetaByAttr("property", "og:description", opts.description);
+      ensureMetaByAttr("name", "twitter:description", opts.description);
+    }
+    if (opts.title) {
+      ensureMetaByAttr("property", "og:title", opts.title);
+      ensureMetaByAttr("name", "twitter:title", opts.title);
+    }
+    if (opts.url) {
+      ensureCanonical(opts.url);
+      ensureMetaByAttr("property", "og:url", opts.url);
+    }
+    if (opts.image) {
+      ensureMetaByAttr("property", "og:image", opts.image);
+      ensureMetaByAttr("name", "twitter:image", opts.image);
+    }
+    if (opts.type) {
+      ensureMetaByAttr("property", "og:type", opts.type);
+    }
+  }
+
+  function upsertJsonLd(id, data) {
+    var el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement("script");
+      el.type = "application/ld+json";
+      el.id = id;
+      document.head.appendChild(el);
+    }
+    el.textContent = JSON.stringify(data);
+  }
+
+  function injectHomeJsonLd() {
+    if (!$("body.page-home").length) return;
+    upsertJsonLd("ld-organization", {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "آبرنگ",
+      url: siteOrigin() + "/",
+      logo: absoluteUrl("/"),
+    });
+    upsertJsonLd("ld-website", {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "آبرنگ",
+      url: siteOrigin() + "/",
+      potentialAction: {
+        "@type": "SearchAction",
+        target: siteOrigin() + "/shop.html?q={search_term_string}",
+        "query-input": "required name=search_term_string",
+      },
+    });
+  }
+
+  function injectProductJsonLd(product) {
+    if (!product) return;
+    var price = product.salePrice || product.price || 0;
+    var inStock = !productIsOutOfStock(product);
+    var image = product.image || "";
+    if (image && image.indexOf("data:") === 0) image = "";
+    upsertJsonLd("ld-product", {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: product.name,
+      image: image ? [absoluteUrl(image)] : undefined,
+      sku: product.id,
+      brand: { "@type": "Brand", name: "آبرنگ" },
+      offers: {
+        "@type": "Offer",
+        url: absoluteUrl("/product.html?id=" + encodeURIComponent(product.id)),
+        priceCurrency: "IRR",
+        price: String(Math.round(Number(price) || 0) * 10),
+        availability: inStock
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+        seller: { "@type": "Organization", name: "آبرنگ" },
+      },
+    });
+  }
+
   function productCard(p) {
     var price = p.salePrice || p.price;
     var href = productHref(p.id);
     var img = p.image || PLACEHOLDER_IMG;
-    var blank = ' target="_blank" rel="noopener noreferrer"';
     var oos = productIsOutOfStock(p);
     var actionBtn = oos
       ? '<span class="btn-colors is-oos" aria-disabled="true">ناموجود</span>'
-      : '<a class="btn-colors" href="' +
-        href +
-        '"' +
-        blank +
-        ">رنگبندی و جزئیات</a>";
+      : '<a class="btn-colors" href="' + href + '">رنگبندی و جزئیات</a>';
     return (
       '<article class="product-card' +
       (oos ? " is-oos" : "") +
       '" data-id="' +
-      p.id +
+      escapeHtml(p.id) +
       '">' +
       '<a class="product-media" href="' +
       href +
-      '"' +
-      blank +
-      ">" +
+      '">' +
       '<img src="' +
       img +
       '" alt="' +
-      p.name +
+      escapeHtml(p.name) +
       '" loading="lazy" onerror="this.onerror=null;this.src=\'' +
       PLACEHOLDER_IMG +
       '\'" />' +
       "</a>" +
       "<h3><a href=\"" +
       href +
-      '"' +
-      blank +
-      ">" +
-      p.name +
+      '">' +
+      escapeHtml(p.name) +
       "</a></h3>" +
       '<span class="price-now">' +
       formatPrice(price) +
@@ -379,6 +496,16 @@
     }
     $("#shopCrumbCurrent").text(crumb);
     $("#shopTitle").text(crumb);
+    document.title = crumb + " | آبرنگ";
+    setPageSeo({
+      title: crumb + " | آبرنگ",
+      description:
+        crumb === "فروشگاه"
+          ? "مشاهده و خرید محصولات فروشگاه آبرنگ. فیلتر بر اساس دسته‌بندی، قیمت و حراج."
+          : "خرید " + crumb + " از فروشگاه آبرنگ.",
+      url: absoluteUrl(window.location.pathname + window.location.search),
+      type: "website",
+    });
 
     var total = (list || []).length;
     if (total === 0) {
@@ -1062,6 +1189,21 @@
     document.title = product.name + " | آبرنگ";
 
     var price = product.salePrice || product.price;
+    var seoDesc =
+      (product.desc && String(product.desc).trim()) ||
+      ("خرید " + product.name + " از فروشگاه آبرنگ با ارسال سریع.");
+    if (seoDesc.length > 160) seoDesc = seoDesc.slice(0, 157) + "…";
+    var seoImage = product.image || "";
+    if (seoImage && seoImage.indexOf("data:") === 0) seoImage = "";
+    setPageSeo({
+      title: product.name + " | آبرنگ",
+      description: seoDesc,
+      url: absoluteUrl("/product.html?id=" + encodeURIComponent(product.id)),
+      image: seoImage ? absoluteUrl(seoImage) : "",
+      type: "product",
+    });
+    injectProductJsonLd(product);
+
     var old = product.salePrice
       ? '<span class="price-old">' + formatPrice(product.price) + "</span>"
       : "";
@@ -1742,6 +1884,7 @@
     ensureLegalMenuLinks();
     renderCart();
     loadShopProfile();
+    injectHomeJsonLd();
     loadCategories();
     loadProducts();
 

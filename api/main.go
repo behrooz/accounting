@@ -210,6 +210,18 @@ func main() {
 		}
 		c.JSON(http.StatusOK, s)
 	})
+	api.GET("/store/sitemap.xml", func(c *gin.Context) {
+		origin := strings.TrimSpace(c.Query("origin"))
+		if origin == "" {
+			origin = "https://abrangstyle.ir"
+		}
+		body, err := repo.BuildStorefrontSitemap(database, origin)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		c.Data(http.StatusOK, "application/xml; charset=utf-8", body)
+	})
 	api.POST("/checkout", func(c *gin.Context) {
 		var body repo.CheckoutRequest
 		if err := c.ShouldBindJSON(&body); err != nil {
