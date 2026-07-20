@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>فروشگاه | آبرنگ</title>
+  <title>حریم خصوصی | آبرنگ</title>
   <link href="https://fonts.cdnfonts.com/css/iranyekan" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css?v=27" />
 </head>
-<body class="page-shop">
+<body class="page-legal">
   <header class="site-header" id="siteHeader">
     <div class="header-bar">
       <div class="header-side header-side-start">
@@ -18,9 +18,7 @@
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2" stroke-linecap="round"/></svg>
         </button>
       </div>
-
       <a class="brand-logo" href="index.html">آبرنگ</a>
-
       <div class="header-side header-side-end">
         <a class="icon-btn" href="account.html" aria-label="حساب کاربری">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.8-3.2 4-4.8 7-4.8s5.2 1.6 7 4.8" stroke-linecap="round"/></svg>
@@ -36,19 +34,15 @@
   <aside class="menu-drawer" id="menuDrawer" aria-hidden="true">
     <div class="menu-drawer-panel">
       <form class="menu-search" action="shop.html" method="get">
-        <input type="search" name="q" id="shopSearchInput" placeholder="کد یا اسم محصول را جستجو کنید" autocomplete="off" />
+        <input type="search" name="q" placeholder="کد یا اسم محصول را جستجو کنید" autocomplete="off" />
         <button type="submit" aria-label="جستجو">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2" stroke-linecap="round"/></svg>
         </button>
       </form>
-
       <div class="menu-panel is-active">
         <a class="menu-link" href="index.html">خانه</a>
-        <a class="menu-link is-active" href="shop.html">فروشگاه</a>
-        <a class="menu-link menu-link-sale" href="shop.html#sale">
-          <span>حراج</span>
-          <span class="sale-dot" aria-hidden="true"></span>
-        </a>
+        <a class="menu-link" href="shop.html">فروشگاه</a>
+        <a class="menu-link menu-link-sale" href="shop.html#sale"><span>حراج</span><span class="sale-dot" aria-hidden="true"></span></a>
         <div class="menu-cats" id="menuCategories"></div>
         <a class="menu-link" href="about.html">درباره ما</a>
         <a class="menu-link" href="contact.html">تماس با ما</a>
@@ -60,69 +54,31 @@
     </div>
   </aside>
 
-  <main class="shop-page">
-    <div class="shop-meta">
-      <nav class="shop-breadcrumb" aria-label="مسیر">
-        <a href="index.html">خانه</a>
-        <span>/</span>
-        <span id="shopCrumbCurrent">فروشگاه</span>
-      </nav>
-      <p class="shop-result-count" id="shopResultCount">در حال بارگذاری…</p>
+  <main class="legal-page">
+    <nav class="legal-breadcrumb" aria-label="مسیر">
+      <a href="index.html">خانه</a><span>/</span><span>حریم خصوصی</span>
+    </nav>
+    <h1>سیاست حریم خصوصی</h1>
+    <div class="legal-body">
+<p>فروشگاه آبرنگ متعهد است از اطلاعات شخصی کاربران مطابق قوانین جاری محافظت کند.</p>
+      <h2>اطلاعاتی که جمع‌آوری می‌کنیم</h2>
+      <ul>
+        <li>نام و شماره موبایل برای ثبت‌نام و ورود</li>
+        <li>آدرس و اطلاعات ارسال برای تحویل سفارش</li>
+        <li>اطلاعات سفارش‌ها برای پشتیبانی و پیگیری</li>
+      </ul>
+      <h2>نحوه استفاده</h2>
+      <ul>
+        <li>پردازش و ارسال سفارش</li>
+        <li>ارتباط پشتیبانی در صورت نیاز</li>
+        <li>اطلاع‌رسانی وضعیت سفارش یا موجودی (در صورت درخواست کاربر)</li>
+      </ul>
+      <h2>اشتراک‌گذاری اطلاعات</h2>
+      <p>اطلاعات کاربران بدون مجوز قانونی یا ضرورت اجرای سفارش (مانند شرکت حمل) در اختیار شخص ثالث قرار نمی‌گیرد.</p>
+      <h2>امنیت</h2>
+      <p>تلاش می‌کنیم با استفاده از بستر امن و دسترسی محدود، از اطلاعات شما محافظت کنیم. با این حال هیچ سامانه‌ای مطلقاً بدون ریسک نیست.</p>
     </div>
-
-    <div class="shop-actions">
-      <button type="button" class="shop-action-btn" id="shopFilterBtn" aria-haspopup="dialog">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-          <path d="M4 6h16M7 12h10M10 18h4" stroke-linecap="round"/>
-        </svg>
-        <span>فیلترهای جستجو</span>
-      </button>
-      <button type="button" class="shop-action-btn shop-sort-btn" id="shopSortBtn" aria-label="مرتب‌سازی" aria-haspopup="dialog">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-          <path d="M8 4v16M5 7l3-3 3 3M16 20V4M13 17l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-    </div>
-
-    <input type="hidden" id="sortFilter" value="new" />
-
-    <div class="product-grid" id="shopProducts"></div>
-    <p class="empty-state" id="shopEmpty" hidden>محصولی پیدا نشد.</p>
   </main>
-
-  <!-- Sort sheet -->
-  <div class="shop-sheet" id="shopSortSheet" hidden>
-    <div class="shop-sheet-backdrop" data-close-sheet></div>
-    <div class="shop-sheet-panel" role="dialog" aria-label="مرتب‌سازی">
-      <div class="shop-sheet-head">
-        <h2>مرتب‌سازی</h2>
-        <button type="button" class="shop-sheet-close" data-close-sheet aria-label="بستن">×</button>
-      </div>
-      <div class="shop-sheet-body shop-sort-options">
-        <button type="button" class="shop-sort-option is-active" data-sort="new">جدیدترین</button>
-        <button type="button" class="shop-sort-option" data-sort="price-asc">ارزان‌ترین</button>
-        <button type="button" class="shop-sort-option" data-sort="price-desc">گران‌ترین</button>
-        <button type="button" class="shop-sort-option" data-sort="sale">حراج</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Filter sheet -->
-  <div class="shop-sheet" id="shopFilterSheet" hidden>
-    <div class="shop-sheet-backdrop" data-close-sheet></div>
-    <div class="shop-sheet-panel" role="dialog" aria-label="فیلترهای جستجو">
-      <div class="shop-sheet-head">
-        <h2>فیلترهای جستجو</h2>
-        <button type="button" class="shop-sheet-close" data-close-sheet aria-label="بستن">×</button>
-      </div>
-      <div class="shop-sheet-body">
-        <p class="shop-filter-label">دسته‌بندی</p>
-        <div class="shop-filter-cats" id="shopFilterCats">
-          <a href="shop.html" class="shop-filter-cat is-active" data-all="1">همه محصولات</a>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <footer class="site-footer" id="siteFooter"></footer>
 
@@ -151,7 +107,7 @@
   <div class="overlay" id="overlay" hidden></div>
 
   <nav class="bottom-nav" aria-label="منوی پایین">
-    <a href="shop.html" class="bottom-nav-item is-active">
+    <a href="shop.html" class="bottom-nav-item">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/><path d="M9 21h6" stroke-linecap="round"/><path d="M8 12h8" stroke-linecap="round"/></svg>
       <span>فروشگاه</span>
     </a>
@@ -177,9 +133,9 @@
   </nav>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-  <script src="js/runtime-config.js?v=12"></script>
+  <script src="js/runtime-config.js?v=14"></script>
   <script src="js/config.js?v=27"></script>
-  <script src="js/data.js?v=12"></script>
+  <script src="js/data.js?v=14"></script>
   <script src="js/auth.js?v=23"></script>
   <script src="js/main.js?v=27"></script>
 </body>

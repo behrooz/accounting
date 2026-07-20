@@ -2,13 +2,22 @@
 // Override anytime: window.ABERANG_API_BASE_URL = "http://127.0.0.1:8080/api"
 (function () {
   if (window.ABERANG_API_BASE_URL) {
-    window.ABERANG_API_BASE_URL = String(window.ABERANG_API_BASE_URL).replace(/\/$/, "");
+    window.ABERANG_API_BASE_URL = String(window.ABERANG_API_BASE_URL).replace(
+      /\/$/,
+      "",
+    );
   } else {
     var host = (window.location && window.location.hostname) || "127.0.0.1";
     if (!host || host === "null") host = "127.0.0.1";
-    window.ABERANG_API_BASE_URL = ("http://" + host + ":8080/api").replace(/\/$/, "");
+    window.ABERANG_API_BASE_URL = ("http://" + host + ":8080/api").replace(
+      /\/$/,
+      "",
+    );
   }
-  window.ABERANG_API_ORIGIN = String(window.ABERANG_API_BASE_URL).replace(/\/api\/?$/, "");
+  window.ABERANG_API_ORIGIN = String(window.ABERANG_API_BASE_URL).replace(
+    /\/api\/?$/,
+    "",
+  );
   window.ABERANG_MEDIA_URL = function (path) {
     if (!path) return "";
     var s = String(path).trim();
@@ -23,4 +32,10 @@
     }
     return window.ABERANG_API_ORIGIN + "/" + s.replace(/^\//, "");
   };
+
+  // After receiving eNamad, set id + code from enamad.ir panel to show the seal.
+  // Example: { id: "123456", code: "ABCDEF..." }
+  if (!window.ABERANG_ENAMAD) {
+    window.ABERANG_ENAMAD = { id: "", code: "" };
+  }
 })();

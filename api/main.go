@@ -201,6 +201,15 @@ func main() {
 		}
 		c.JSON(http.StatusOK, stock)
 	})
+	// Public shop profile for storefront footer / contact / eNamad pages
+	api.GET("/store/shop", func(c *gin.Context) {
+		s, err := repo.GetShopSettings(database)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		c.JSON(http.StatusOK, s)
+	})
 	api.POST("/checkout", func(c *gin.Context) {
 		var body repo.CheckoutRequest
 		if err := c.ShouldBindJSON(&body); err != nil {

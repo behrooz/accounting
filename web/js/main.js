@@ -1585,11 +1585,163 @@
       });
   }
 
+  function escapeAttr(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
+  }
+
+  function enamadSealHtml() {
+    var cfg = window.ABERANG_ENAMAD || {};
+    var id = String(cfg.id || "").trim();
+    var code = String(cfg.code || "").trim();
+    if (!id || !code) {
+      return (
+        '<div class="enamad-placeholder" title="پس از دریافت اینماد، کد را در config.js تنظیم کنید">' +
+        "<span>جایگاه نماد اعتماد الکترونیکی</span>" +
+        "</div>"
+      );
+    }
+    return (
+      '<a referrerpolicy="origin" target="_blank" rel="noopener" href="https://trustseal.enamad.ir/?id=' +
+      encodeURIComponent(id) +
+      "&Code=" +
+      encodeURIComponent(code) +
+      '">' +
+      '<img src="https://trustseal.enamad.ir/logo.aspx?id=' +
+      encodeURIComponent(id) +
+      "&Code=" +
+      encodeURIComponent(code) +
+      '" alt="نماد اعتماد الکترونیکی" style="cursor:pointer" code="' +
+      escapeAttr(code) +
+      '" />' +
+      "</a>"
+    );
+  }
+
+  function footerHtml(shop) {
+    var name = (shop && shop.name) || "فروشگاه آبرنگ";
+    var phone = (shop && shop.phone) || "";
+    var address = (shop && shop.address) || "";
+    var phoneHtml = phone
+      ? '<a href="tel:' +
+        escapeAttr(phone.replace(/\s+/g, "")) +
+        '">' +
+        escapeHtml(phone) +
+        "</a>"
+      : "<span>تلفن به‌زودی</span>";
+    var addressHtml = address
+      ? escapeHtml(address)
+      : "آدرس در صفحه تماس با ما به‌روزرسانی می‌شود.";
+
+    return (
+      '<div class="footer-inner">' +
+      '<div class="footer-grid">' +
+      '<div class="footer-col">' +
+      "<h3>" +
+      escapeHtml(name) +
+      "</h3>" +
+      '<p class="footer-address">' +
+      addressHtml +
+      "</p>" +
+      '<p class="footer-phone">تلفن: ' +
+      phoneHtml +
+      "</p>" +
+      "</div>" +
+      '<div class="footer-col">' +
+      "<h3>دسترسی سریع</h3>" +
+      '<nav class="footer-links" aria-label="لینک‌های قانونی">' +
+      '<a href="about.html">درباره ما</a>' +
+      '<a href="contact.html">تماس با ما</a>' +
+      '<a href="terms.html">قوانین و مقررات</a>' +
+      '<a href="privacy.html">حریم خصوصی</a>' +
+      '<a href="shipping.html">نحوه ارسال</a>' +
+      '<a href="returns.html">شرایط مرجوعی</a>' +
+      "</nav>" +
+      "</div>" +
+      '<div class="footer-col footer-col-enamad">' +
+      "<h3>نماد اعتماد</h3>" +
+      '<div class="footer-enamad" id="enamadSeal">' +
+      enamadSealHtml() +
+      "</div>" +
+      "</div>" +
+      "</div>" +
+      '<p class="copyright">© ۱۴۰۵ آبرنگ · <a href="https://abrangstyle.ir">abrangstyle.ir</a></p>' +
+      "</div>"
+    );
+  }
+
+  function applyShopProfile(shop) {
+    window.ABERANG_SHOP = shop || {};
+    var name = shop.name || "فروشگاه آبرنگ";
+    var phone = (shop.phone || "").trim();
+    var address = (shop.address || "").trim();
+
+    $(".js-shop-name").text(name);
+    if (phone) {
+      $(".js-shop-phone").text(phone);
+      $(".js-shop-phone-link").attr("href", "tel:" + phone.replace(/\s+/g, ""));
+      $(".js-support-phone")
+        .text(phone)
+        .attr("href", "tel:" + phone.replace(/\s+/g, ""));
+    } else {
+      $(".js-shop-phone").text("ثبت نشده");
+      $(".js-shop-phone-link").removeAttr("href");
+    }
+    $(".js-shop-address").text(address || "ثبت نشده");
+
+    var $footer = $("#siteFooter");
+    if ($footer.length) {
+      $footer.html(footerHtml(shop)).removeClass("compact");
+    }
+  }
+
+  function loadShopProfile() {
+    ensureSiteFooter();
+    var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
+    return $.ajax({
+      url: base + "/store/shop",
+      method: "GET",
+      dataType: "json",
+    })
+      .done(function (shop) {
+        applyShopProfile(shop || {});
+      })
+      .fail(function () {
+        applyShopProfile({
+          name: "فروشگاه آبرنگ",
+          phone: "",
+          address: "",
+        });
+      });
+  }
+
+  function ensureSiteFooter() {
+    var $footer = $("footer.site-footer");
+    if (!$footer.length) return;
+    if (!$footer.attr("id")) $footer.attr("id", "siteFooter");
+  }
+
+  function ensureLegalMenuLinks() {
+    var $panel = $("#menuDrawer .menu-panel.is-active");
+    if (!$panel.length) return;
+    if ($panel.find('a[href="about.html"]').length) return;
+    var $account = $panel.find('a[href="account.html"]').first();
+    var links =
+      '<a class="menu-link" href="about.html">درباره ما</a>' +
+      '<a class="menu-link" href="contact.html">تماس با ما</a>';
+    if ($account.length) $account.before(links);
+    else $panel.append(links);
+  }
+
   $(function () {
     if (window.AberangAuth && typeof AberangAuth.wireAccountLinks === "function") {
       AberangAuth.wireAccountLinks();
     }
+    ensureLegalMenuLinks();
     renderCart();
+    loadShopProfile();
     loadCategories();
     loadProducts();
 
