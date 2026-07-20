@@ -1751,7 +1751,7 @@
       "&Code=" +
       encodeURIComponent(code) +
       '">' +
-      '<img src="https://trustseal.enamad.ir/logo.aspx?id=' +
+      '<img referrerpolicy="origin" src="https://trustseal.enamad.ir/logo.aspx?id=' +
       encodeURIComponent(id) +
       "&Code=" +
       encodeURIComponent(code) +

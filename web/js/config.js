@@ -58,9 +58,11 @@
     return window.ABERANG_API_ORIGIN + "/" + s.replace(/^\//, "");
   };
 
-  // After receiving eNamad, set id + code from enamad.ir panel to show the seal.
-  // Example: { id: "123456", code: "ABCDEF..." }
+  // eNamad trust seal (from enamad.ir panel)
   if (!window.ABERANG_ENAMAD) {
-    window.ABERANG_ENAMAD = { id: "", code: "" };
+    window.ABERANG_ENAMAD = {
+      id: "761331",
+      code: "jDxa6iHKW8s3LfdNSVVsCSgfbYobF93A",
+    };
   }
 })();
