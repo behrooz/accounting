@@ -33,7 +33,7 @@ WORKDIR /usr/share/nginx/html
 COPY --chown=nginx:nginx \
   index.html shop.html product.html checkout.html account.html \
   about.html contact.html terms.html privacy.html shipping.html returns.html \
-  robots.txt sitemap.xml ./
+  robots.txt sitemap.xml 64166234.txt ./
 COPY --chown=nginx:nginx css ./css
 COPY --chown=nginx:nginx js ./js
 
