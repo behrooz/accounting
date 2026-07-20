@@ -11,7 +11,7 @@ strategy:
 image:
   repository: 188.132.232.168:30836/accounting-front
   pullPolicy: IfNotPresent
-  tag: "5"
+  tag: "40"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -104,11 +104,14 @@ env:
     value: "0.0.0.0"
   - name: NEXT_TELEMETRY_DISABLED
     value: "1"
+  # Server-side auth checks (product assistant). Use in-cluster API URL.
+  - name: API_BASE_URL
+    value: "http://accounting-api:8080/api"
 
 # Cursor SDK product assistant. The API key must be provided by an existing
 # Kubernetes Secret; it is never stored in chart values or exposed publicly.
 cursor:
-  enabled: false
+  enabled: true
   secretName: accounting-front-cursor
   secretKey: CURSOR_API_KEY
 

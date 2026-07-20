@@ -7,9 +7,13 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "https://ns-xp45-default-accounting-api.bugx.ir/api";
+function apiBaseUrl(): string {
+  const raw =
+    process.env.API_BASE_URL ??
+    process.env.NEXT_PUBLIC_API_BASE_URL ??
+    "https://ns-xp45-default-accounting-api.bugx.ir/api";
+  return raw.replace(/\/$/, "");
+}
 
 type DraftAttribute = {
   name: string;
@@ -203,16 +207,37 @@ function normalizeDraft(value: unknown): ProductAssistantDraft {
   };
 }
 
-async function isAuthorized(authorization: string): Promise<boolean> {
-  if (!authorization.toLowerCase().startsWith("bearer ")) return false;
+async function verifyDashboardToken(
+  authorization: string,
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  if (!authorization.toLowerCase().startsWith("bearer ")) {
+    return { ok: false, status: 401, error: "توکن ورود ارسال نشده است." };
+  }
   try {
-    const response = await fetch(`${API_BASE_URL}/me`, {
+    const response = await fetch(`${apiBaseUrl()}/me`, {
       headers: { Authorization: authorization },
       cache: "no-store",
     });
-    return response.ok;
-  } catch {
-    return false;
+    if (response.ok) return { ok: true };
+    if (response.status === 401) {
+      return {
+        ok: false,
+        status: 401,
+        error: "توکن ورود نامعتبر یا منقضی شده است. دوباره وارد شوید.",
+      };
+    }
+    return {
+      ok: false,
+      status: 502,
+      error: `بررسی توکن با API ناموفق بود (HTTP ${response.status}).`,
+    };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "network error";
+    return {
+      ok: false,
+      status: 502,
+      error: `اتصال به API برای بررسی توکن برقرار نشد: ${detail}`,
+    };
   }
 }
 
@@ -252,8 +277,9 @@ ${JSON.stringify(description)}`;
 
 export async function POST(request: NextRequest) {
   const authorization = request.headers.get("authorization") ?? "";
-  if (!(await isAuthorized(authorization))) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const auth = await verifyDashboardToken(authorization);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   const apiKey = process.env.CURSOR_API_KEY?.trim();
