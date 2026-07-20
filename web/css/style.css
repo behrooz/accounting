@@ -526,6 +526,26 @@ input {
   background: var(--red-dark);
 }
 
+.btn-colors.is-oos,
+.btn-red.is-oos {
+  background: #9ca3af;
+  color: #fff;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-colors.is-oos:hover,
+.btn-red.is-oos:hover {
+  background: #9ca3af;
+}
+
+.pdp-buy.is-oos .pdp-qty button,
+.pdp-buy.is-oos .js-qty {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .btn-block {
   width: 100%;
 }

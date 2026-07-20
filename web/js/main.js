@@ -218,6 +218,10 @@
       });
     }
 
+    var totalQuantity = variants.reduce(function (sum, v) {
+      return sum + (Number(v.quantity) || 0);
+    }, 0);
+
     return {
       id: api.id,
       name: api.name || "بدون نام",
@@ -232,8 +236,21 @@
       images: images,
       desc: "",
       variants: variants,
-      attributes: attrs
+      attributes: attrs,
+      totalQuantity: totalQuantity
     };
+  }
+
+  function productIsOutOfStock(p) {
+    if (!p) return false;
+    if (typeof p.totalQuantity === "number") {
+      return p.totalQuantity <= 0;
+    }
+    var variants = p.variants || [];
+    if (!variants.length) return false;
+    return variants.every(function (v) {
+      return (Number(v.quantity) || 0) <= 0;
+    });
   }
 
   function getProducts() {
@@ -255,8 +272,18 @@
     var href = productHref(p.id);
     var img = p.image || PLACEHOLDER_IMG;
     var blank = ' target="_blank" rel="noopener noreferrer"';
+    var oos = productIsOutOfStock(p);
+    var actionBtn = oos
+      ? '<span class="btn-colors is-oos" aria-disabled="true">ناموجود</span>'
+      : '<a class="btn-colors" href="' +
+        href +
+        '"' +
+        blank +
+        ">رنگبندی و جزئیات</a>";
     return (
-      '<article class="product-card" data-id="' +
+      '<article class="product-card' +
+      (oos ? " is-oos" : "") +
+      '" data-id="' +
       p.id +
       '">' +
       '<a class="product-media" href="' +
@@ -282,11 +309,7 @@
       '<span class="price-now">' +
       formatPrice(price) +
       "</span>" +
-      '<a class="btn-colors" href="' +
-      href +
-      '"' +
-      blank +
-      ">رنگبندی و جزئیات</a>" +
+      actionBtn +
       "</article>"
     );
   }
@@ -1060,6 +1083,13 @@
         "</div></details>"
       : "";
 
+    var allOos = productIsOutOfStock(product);
+    var addBtnClass = "btn-red js-add-detail" + (allOos ? " is-oos" : "");
+    var addBtnDisabled = allOos ? ' disabled aria-disabled="true"' : "";
+    var addBtnText = allOos ? "ناموجود" : "افزودن به سبد خرید";
+    var stickyBtnText = allOos ? "ناموجود" : "افزودن به سبد";
+    var qtyDisabled = allOos ? " disabled" : "";
+
     $page.html(
       '<div class="pdp" data-id="' +
         product.id +
@@ -1104,15 +1134,29 @@
             "</div></div>"
           : "") +
         productAttrsHtml(product) +
-        '<div class="pdp-buy">' +
+        '<div class="pdp-buy' +
+        (allOos ? " is-oos" : "") +
+        '">' +
         '<div class="pdp-qty" aria-label="تعداد">' +
-        '<button type="button" class="js-qty-dec" aria-label="کاهش">−</button>' +
-        '<input type="number" class="js-qty" value="1" min="1" max="99" inputmode="numeric" />' +
-        '<button type="button" class="js-qty-inc" aria-label="افزایش">+</button>' +
+        '<button type="button" class="js-qty-dec" aria-label="کاهش"' +
+        qtyDisabled +
+        ">−</button>" +
+        '<input type="number" class="js-qty" value="1" min="1" max="99" inputmode="numeric"' +
+        qtyDisabled +
+        " />" +
+        '<button type="button" class="js-qty-inc" aria-label="افزایش"' +
+        qtyDisabled +
+        ">+</button>" +
         "</div>" +
-        '<button type="button" class="btn-red js-add-detail" data-id="' +
+        '<button type="button" class="' +
+        addBtnClass +
+        '" data-id="' +
         product.id +
-        '">افزودن به سبد خرید</button>' +
+        '"' +
+        addBtnDisabled +
+        ">" +
+        addBtnText +
+        "</button>" +
         "</div>" +
         extras +
         descBlock +
@@ -1124,9 +1168,15 @@
         '</strong><span class="price-now">' +
         formatPrice(price) +
         "</span></div>" +
-        '<button type="button" class="btn-red js-add-detail" data-id="' +
+        '<button type="button" class="' +
+        addBtnClass +
+        '" data-id="' +
         product.id +
-        '">افزودن به سبد</button>' +
+        '"' +
+        addBtnDisabled +
+        ">" +
+        stickyBtnText +
+        "</button>" +
         "</div></div>" +
         "</div>"
     );
@@ -1498,8 +1548,10 @@
     });
 
     $(document).on("click", ".js-add-detail", function () {
+      if ($(this).prop("disabled") || $(this).hasClass("is-oos")) return;
       var p = findProduct($(this).data("id"));
       if (!p) return;
+      if (productIsOutOfStock(p)) return;
       var qty = Number($("#productPage .js-qty").val()) || 1;
       var sel = collectProductSelection(p);
       if (!sel.variantId && (p.variants || []).length) {
