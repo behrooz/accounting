@@ -13,13 +13,16 @@ window.ABERANG_API_BASE_URL = "${API_BASE}";
 window.ABERANG_SITE_ORIGIN = "${SITE_ORIGIN}";
 EOF
 
-# Prefer live product sitemap from API; fall back to static file on failure.
-if wget -qO /usr/share/nginx/html/sitemap.xml \
-  "${API_BASE}/store/sitemap.xml?origin=${SITE_ORIGIN}" 2>/dev/null; then
-  :
-else
-  # keep packaged static sitemap.xml if fetch fails
-  true
-fi
+# Refresh sitemap in the background so nginx (and probes) start immediately.
+# Busybox wget: -T timeout seconds. Never block container startup on API reachability.
+(
+  tmp="/tmp/sitemap-refresh.xml"
+  if wget -q -T 5 -O "$tmp" \
+    "${API_BASE}/store/sitemap.xml?origin=${SITE_ORIGIN}" 2>/dev/null; then
+    mv "$tmp" /usr/share/nginx/html/sitemap.xml
+  else
+    rm -f "$tmp"
+  fi
+) >/dev/null 2>&1 &
 
 exec nginx -g "daemon off;"
