@@ -322,6 +322,15 @@
     hasMore: true,
     requestSerial: 0
   };
+  var relatedPaging = {
+    categoryId: "",
+    excludeId: "",
+    offset: 0,
+    loading: false,
+    hasMore: true,
+    requestSerial: 0,
+    items: []
+  };
 
   function loadProducts() {
     var $home = $("#homeProducts");
@@ -527,6 +536,111 @@
           productPaging.loading = false;
         }
       });
+  }
+
+  function renderRelatedProducts() {
+    var $grid = $("#relatedProducts");
+    if (!$grid.length) return;
+
+    var list = relatedPaging.items;
+    if (!list.length) {
+      $grid.empty();
+      $("#relatedEmpty").prop("hidden", false).text("محصول مرتبطی یافت نشد.");
+      return;
+    }
+    $("#relatedEmpty").prop("hidden", true);
+    $grid.html(list.map(productCard).join(""));
+  }
+
+  function fetchRelatedBatch(reset) {
+    if (!relatedPaging.categoryId) return;
+    if (!reset && (relatedPaging.loading || !relatedPaging.hasMore)) return;
+
+    var serial = relatedPaging.requestSerial;
+    var offset = reset ? 0 : relatedPaging.offset;
+    relatedPaging.loading = true;
+
+    var $grid = $("#relatedProducts");
+    if (reset) {
+      $grid.html('<p class="cat-loading">در حال بارگذاری محصولات...</p>');
+      $("#relatedEmpty").prop("hidden", true);
+    }
+
+    var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
+    return $.ajax({
+      url: base + "/products",
+      method: "GET",
+      data: {
+        limit: PRODUCT_PAGE_SIZE,
+        offset: offset,
+        sort: "new",
+        categoryId: relatedPaging.categoryId
+      },
+      dataType: "json"
+    })
+      .done(function (rows) {
+        if (serial !== relatedPaging.requestSerial) return;
+        var batch = (Array.isArray(rows) ? rows : [])
+          .map(mapApiProduct)
+          .filter(function (p) {
+            return p.id !== relatedPaging.excludeId;
+          });
+
+        if (reset) relatedPaging.items = batch.slice();
+        else {
+          var known = {};
+          relatedPaging.items.forEach(function (p) {
+            known[p.id] = true;
+          });
+          batch.forEach(function (p) {
+            if (!known[p.id]) {
+              known[p.id] = true;
+              relatedPaging.items.push(p);
+            }
+          });
+        }
+
+        var rawLen = Array.isArray(rows) ? rows.length : 0;
+        relatedPaging.offset = offset + rawLen;
+        relatedPaging.hasMore = rawLen === PRODUCT_PAGE_SIZE;
+        renderRelatedProducts();
+      })
+      .fail(function () {
+        if (serial !== relatedPaging.requestSerial) return;
+        if (reset) {
+          relatedPaging.items = [];
+          $grid.html("");
+          $("#relatedEmpty")
+            .prop("hidden", false)
+            .text("دریافت محصولات مرتبط ناموفق بود.");
+        }
+      })
+      .always(function () {
+        if (serial === relatedPaging.requestSerial) {
+          relatedPaging.loading = false;
+        }
+      });
+  }
+
+  function loadRelatedProducts(product, reset) {
+    if (!product || !product.categoryId) {
+      relatedPaging.categoryId = "";
+      relatedPaging.items = [];
+      $("#pdpRelated").prop("hidden", true);
+      return;
+    }
+
+    if (reset !== false) {
+      relatedPaging.categoryId = String(product.categoryId);
+      relatedPaging.excludeId = product.id;
+      relatedPaging.offset = 0;
+      relatedPaging.hasMore = true;
+      relatedPaging.items = [];
+      relatedPaging.requestSerial++;
+      $("#pdpRelated").prop("hidden", false);
+    }
+
+    return fetchRelatedBatch(reset !== false);
   }
 
   function loadShopProducts(reset) {
@@ -1090,6 +1204,27 @@
     var stickyBtnText = allOos ? "ناموجود" : "افزودن به سبد";
     var qtyDisabled = allOos ? " disabled" : "";
 
+    var relatedSection = product.categoryId
+      ? '<section class="pdp-related" id="pdpRelated">' +
+        '<div class="pdp-related-head">' +
+        "<h2>محصولات مرتبط</h2>" +
+        (product.categoryName
+          ? '<a class="pdp-related-more" href="shop.html?categoryId=' +
+            encodeURIComponent(product.categoryId) +
+            (product.categorySlug || product.category
+              ? "&cat=" +
+                encodeURIComponent(product.categorySlug || product.category)
+              : "") +
+            '">مشاهده همه</a>'
+          : "") +
+        "</div>" +
+        '<div class="product-grid" id="relatedProducts">' +
+        '<p class="cat-loading">در حال بارگذاری محصولات...</p>' +
+        "</div>" +
+        '<p class="empty-state" id="relatedEmpty" hidden>محصول مرتبطی یافت نشد.</p>' +
+        "</section>"
+      : "";
+
     $page.html(
       '<div class="pdp" data-id="' +
         product.id +
@@ -1159,6 +1294,7 @@
         "</button>" +
         "</div>" +
         extras +
+        relatedSection +
         descBlock +
         "</div>" +
         '<div class="pdp-sticky" hidden>' +
@@ -1182,6 +1318,7 @@
     );
 
     bindProductGallery($page, images);
+    loadRelatedProducts(product, true);
   }
 
   function bindProductGallery($page, images) {
@@ -1457,13 +1594,15 @@
     loadProducts();
 
     $(window).off("scroll.products").on("scroll.products", function () {
-      if (!productPaging.context || productPaging.loading || !productPaging.hasMore) {
-        return;
-      }
       var viewportBottom = $(window).scrollTop() + $(window).height();
       var loadAt = $(document).height() - 500;
-      if (viewportBottom >= loadAt) {
+      if (viewportBottom < loadAt) return;
+
+      if (productPaging.context && !productPaging.loading && productPaging.hasMore) {
         fetchProductBatch(productPaging.context, false);
+      }
+      if (relatedPaging.categoryId && !relatedPaging.loading && relatedPaging.hasMore) {
+        fetchRelatedBatch(false);
       }
     });
 

@@ -1081,6 +1081,50 @@ input {
   gap: 1rem 0.7rem;
 }
 
+.pdp-related {
+  margin-top: 1.25rem;
+  padding: 1.25rem 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.pdp-related-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.pdp-related-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pdp-related-more {
+  font-size: 0.85rem;
+  color: var(--red);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pdp-related-more:hover {
+  text-decoration: underline;
+}
+
+.pdp-related .product-grid {
+  padding: 0;
+}
+
+.pdp-related .empty-state,
+.pdp-related .cat-loading {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 1rem 0;
+}
+
 /* ── Product detail (mobile-first gallery) ── */
 .pdp {
   display: grid;
