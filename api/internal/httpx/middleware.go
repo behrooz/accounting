@@ -79,7 +79,7 @@ func Cors(originsCSV string) gin.HandlerFunc {
 		origin = strings.TrimRight(origin, "/")
 
 		allow := ""
-		if origin != "" && (allowAny || allowed[origin] || isLocalDevOrigin(origin) || isBugxOrigin(origin, allowed)) {
+		if origin != "" && (allowAny || allowed[origin] || isLocalDevOrigin(origin) || isAbrangstyleOrigin(origin) || isBugxOrigin(origin, allowed)) {
 			// Echo request Origin — browsers reject "*" with credentials,
 			// and require an exact match with the page origin.
 			allow = origin
@@ -117,6 +117,17 @@ func isLocalDevOrigin(origin string) bool {
 	default:
 		return false
 	}
+}
+
+// isAbrangstyleOrigin always allows the production storefront/admin domain
+// and any subdomain (e.g. admin.abrangstyle.ir, www.abrangstyle.ir).
+func isAbrangstyleOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host == "abrangstyle.ir" || strings.HasSuffix(host, ".abrangstyle.ir")
 }
 
 // isBugxOrigin allows sibling *.bugx.ir hosts when any bugx.ir origin is configured

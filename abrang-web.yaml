@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: nginx
+    meta.helm.sh/release-name: accounting-web
+    meta.helm.sh/release-namespace: default    
+  labels:
+    app.kubernetes.io/instance: accounting-web
+    app.kubernetes.io/name: accounting-web
+  name: accounting-web-abrang
+  namespace: default  
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: abrangstyle.ir
+    http:
+      paths:
+      - backend:
+          service:
+            name: accounting-web
+            port:
+              number: 8080
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - abrangstyle.ir
+    secretName: accounting-web-abrang-tls

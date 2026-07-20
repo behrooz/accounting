@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: nginx
+    meta.helm.sh/release-name: accounting-front
+    meta.helm.sh/release-namespace: default    
+  labels:
+    app.kubernetes.io/instance: accounting-front
+    app.kubernetes.io/name: accounting-front
+  name: accounting-front-abrang
+  namespace: default  
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: admin.abrangstyle.ir
+    http:
+      paths:
+      - backend:
+          service:
+            name: accounting-front
+            port:
+              number: 3000
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - admin.abrangstyle.ir
+    secretName: accounting-front-abrang-tls
