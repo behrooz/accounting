@@ -197,7 +197,30 @@
       .filter(function (n) {
         return n > 0;
       });
-    var price = sellPrices.length ? Math.min.apply(null, sellPrices) : 0;
+    var displayPrice = Number(api.displayPrice) || 0;
+    if (!displayPrice && sellPrices.length) {
+      displayPrice = Math.min.apply(null, sellPrices);
+    }
+    var compareAt = Number(api.compareAtPrice) || 0;
+    var discountPercent = Number(api.discountPercent) || 0;
+    var onSale = !!api.onSale || discountPercent > 0;
+    if (!discountPercent && variants.length) {
+      variants.forEach(function (v) {
+        var sell = Number(v.salePrice) || 0;
+        var cost = Number(v.price) || 0;
+        var display = sell > 0 ? sell : cost;
+        var compare = Number(v.compareAtPrice) || 0;
+        if (compare > display && display > 0) {
+          onSale = true;
+          var pct = Math.round(((compare - display) * 100) / compare);
+          if (pct > discountPercent) discountPercent = pct;
+        }
+      });
+    }
+    var listPrice = onSale && compareAt > displayPrice ? compareAt : displayPrice;
+    var salePrice = onSale && compareAt > displayPrice ? displayPrice : null;
+
+    var price = listPrice;
 
     var colors = [];
     var attrs = Array.isArray(api.attributes) ? api.attributes : [];
@@ -229,8 +252,12 @@
       category: cat ? cat.slug : "",
       categorySlug: cat ? cat.slug : "",
       categoryName: cat ? cat.name : "",
-      price: price,
-      salePrice: null,
+      price: listPrice,
+      salePrice: salePrice,
+      discountPercent: discountPercent,
+      onSale: onSale,
+      displayPrice: displayPrice,
+      compareAtPrice: compareAt,
       colors: colors,
       image: images[0] || PLACEHOLDER_IMG,
       images: images,
@@ -393,11 +420,25 @@
     });
   }
 
+  function productDiscountBadge(p) {
+    var pct = Number(p && p.discountPercent) || 0;
+    if (pct <= 0) return "";
+    return (
+      '<span class="product-discount-badge">-' +
+      faNum(pct) +
+      "٪</span>"
+    );
+  }
+
   function productCard(p) {
     var price = p.salePrice || p.price;
     var href = productHref(p.id);
     var img = p.image || PLACEHOLDER_IMG;
     var oos = productIsOutOfStock(p);
+    var oldPrice =
+      p.salePrice && p.price && p.price > price
+        ? '<span class="price-old">' + formatPrice(p.price) + "</span>"
+        : "";
     var actionBtn = oos
       ? '<span class="btn-colors is-oos" aria-disabled="true">ناموجود</span>'
       : '<a class="btn-colors" href="' + href + '">رنگبندی و جزئیات</a>';
@@ -410,6 +451,7 @@
       '<a class="product-media" href="' +
       href +
       '">' +
+      productDiscountBadge(p) +
       '<img src="' +
       img +
       '" alt="' +
@@ -423,9 +465,11 @@
       '">' +
       escapeHtml(p.name) +
       "</a></h3>" +
+      '<div class="price-row">' +
+      oldPrice +
       '<span class="price-now">' +
       formatPrice(price) +
-      "</span>" +
+      "</span></div>" +
       actionBtn +
       "</article>"
     );
@@ -1519,6 +1563,7 @@
         images.length +
         '">' +
         '<div class="pdp-stage" tabindex="0" aria-roledescription="carousel">' +
+        productDiscountBadge(product) +
         (images.length > 1
           ? '<button type="button" class="pdp-nav pdp-prev" aria-label="قبلی">‹</button>'
           : "") +

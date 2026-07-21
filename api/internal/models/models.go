@@ -21,6 +21,10 @@ type Product struct {
 	Images          []string           `json:"images,omitempty"`
 	Attributes      []ProductAttribute `json:"attributes"`
 	Variants        []ProductVariant   `json:"variants"`
+	DisplayPrice    int64              `json:"displayPrice,omitempty"`
+	CompareAtPrice  int64              `json:"compareAtPrice,omitempty"`
+	DiscountPercent int                `json:"discountPercent,omitempty"`
+	OnSale          bool               `json:"onSale,omitempty"`
 }
 
 type ProductCategory struct {
@@ -51,6 +55,7 @@ type ProductVariant struct {
 	SKU             string            `json:"sku"`
 	Price           int64             `json:"price"`
 	SalePrice       int64             `json:"salePrice"`
+	CompareAtPrice  int64             `json:"compareAtPrice,omitempty"`
 	Quantity        int               `json:"quantity"`
 	AttributeValues map[string]string `json:"attributeValues"`
 	Image           *string           `json:"image,omitempty"`

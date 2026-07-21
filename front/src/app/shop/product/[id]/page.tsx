@@ -5,11 +5,14 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   getProductById,
-  productMinPrice,
-  productMaxPrice,
+  productCompareAtPrice,
+  productDiscountPercent,
+  productDisplayPrice,
+  productOnSale,
   type Product,
 } from "@/lib/products";
 import { mediaUrl } from "@/lib/media";
+import ProductDiscountBadge from "@/components/ProductDiscountBadge";
 
 const PLACEHOLDER =
   "https://images.unsplash.com/photo-1520975919572-9aebc6a48b6b?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=4c1b8f9b1b7d6b0b1f2a9d6e2c8f7f4a";
@@ -91,6 +94,10 @@ export default function ProductDetailPage() {
   }
 
   const totalStock = product.variants.reduce((s, v) => s + v.quantity, 0);
+  const discount = productDiscountPercent(product);
+  const displayPrice = productDisplayPrice(product);
+  const compareAt = productCompareAtPrice(product);
+  const onSale = productOnSale(product);
 
   return (
     <div className="rounded border border-[#d5dbdb] bg-white p-6 shadow-sm">
@@ -102,6 +109,7 @@ export default function ProductDetailPage() {
             onTouchStart={onTouchStart}
             onTouchEnd={onTouchEnd}
           >
+            <ProductDiscountBadge percent={discount} />
             {slides.map((src, i) => (
               <img
                 key={i}
@@ -159,13 +167,16 @@ export default function ProductDetailPage() {
         <div className="flex flex-col">
           <h1 className="text-2xl font-bold text-[#16191f]">{product.name}</h1>
 
-          <p className="mt-2 text-sm text-[#545b64]">
-            قیمت:{" "}
-            <span className="font-semibold text-[#16191f]">
-              {productMinPrice(product).toLocaleString("fa-IR")} –{" "}
-              {productMaxPrice(product).toLocaleString("fa-IR")} تومان
+          <div className="mt-2 flex flex-wrap items-baseline gap-2">
+            {onSale && compareAt > displayPrice ? (
+              <span className="text-sm text-[#879596] line-through">
+                {compareAt.toLocaleString("fa-IR")} تومان
+              </span>
+            ) : null}
+            <span className="text-lg font-semibold text-[#16191f]">
+              {displayPrice.toLocaleString("fa-IR")} تومان
             </span>
-          </p>
+          </div>
 
           <p className="mt-2 text-sm text-[#545b64]">
             موجودی کل:{" "}

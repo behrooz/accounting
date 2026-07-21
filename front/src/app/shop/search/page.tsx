@@ -3,8 +3,17 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { getProducts, type Product, productPriceRange } from "@/lib/products";
+import {
+  getProducts,
+  productCompareAtPrice,
+  productDiscountPercent,
+  productDisplayPrice,
+  productOnSale,
+  productPriceRange,
+  type Product,
+} from "@/lib/products";
 import { mediaUrl } from "@/lib/media";
+import ProductDiscountBadge from "@/components/ProductDiscountBadge";
 
 const PLACEHOLDER =
   "https://images.unsplash.com/photo-1520975919572-9aebc6a48b6b?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=4c1b8f9b1b7d6b0b1f2a9d6e2c8f7f4a";
@@ -87,6 +96,10 @@ export default function ShopSearchPage() {
           {filtered.map((product) => {
             const images = getProductImages(product);
             const thumb = images[0] ?? PLACEHOLDER;
+            const discount = productDiscountPercent(product);
+            const displayPrice = productDisplayPrice(product);
+            const compareAt = productCompareAtPrice(product);
+            const onSale = productOnSale(product);
             return (
               <article
                 key={product.id}
@@ -99,6 +112,7 @@ export default function ShopSearchPage() {
                       alt={product.name}
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
+                    <ProductDiscountBadge percent={discount} />
                   </div>
                 </Link>
                 <div className="p-4 flex flex-1 flex-col">
@@ -107,8 +121,15 @@ export default function ShopSearchPage() {
                   </h2>
                   <p className="mt-2 text-sm text-[#545b64]">
                     قیمت:{" "}
+                    {onSale && compareAt > displayPrice ? (
+                      <span className="text-[#879596] line-through">
+                        {compareAt.toLocaleString("fa-IR")}{" "}
+                      </span>
+                    ) : null}
                     <span className="font-semibold text-[#16191f]">
-                      {productPriceRange(product)}
+                      {onSale
+                        ? displayPrice.toLocaleString("fa-IR")
+                        : productPriceRange(product)}
                     </span>
                   </p>
                   <Link

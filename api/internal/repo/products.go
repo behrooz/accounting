@@ -45,6 +45,7 @@ type varRow struct {
 	SKU             string         `db:"sku"`
 	Price           int64          `db:"price"`
 	SalePrice       int64          `db:"sale_price"`
+	CompareAtPrice  int64          `db:"compare_at_price"`
 	Quantity        int            `db:"quantity"`
 	AttributeValues string         `db:"attribute_values"`
 	Image           sql.NullString `db:"image"`
@@ -297,6 +298,7 @@ func loadProductsBatch(db *sqlx.DB, ps []productRow) ([]models.Product, error) {
 			SKU:             v.SKU,
 			Price:           v.Price,
 			SalePrice:       v.SalePrice,
+			CompareAtPrice:  v.CompareAtPrice,
 			Quantity:        v.Quantity,
 			AttributeValues: m,
 			Image:           img,
@@ -323,6 +325,9 @@ func loadProductsBatch(db *sqlx.DB, ps []productRow) ([]models.Product, error) {
 			Attributes:     fullAttrs,
 			Variants:       variantsByProduct[p.ID],
 		})
+	}
+	for i := range out {
+		ApplyProductListingPricing(&out[i])
 	}
 	return out, nil
 }
@@ -427,6 +432,7 @@ func getProduct(db *sqlx.DB, id string, publishedOnly bool) (*models.Product, er
 			SKU:             v.SKU,
 			Price:           v.Price,
 			SalePrice:       v.SalePrice,
+			CompareAtPrice:  v.CompareAtPrice,
 			Quantity:        v.Quantity,
 			AttributeValues: m,
 			Image:           img,
@@ -443,7 +449,7 @@ func getProduct(db *sqlx.DB, id string, publishedOnly bool) (*models.Product, er
 		})
 	}
 
-	return &models.Product{
+	full := &models.Product{
 		ID:             p.ID,
 		Name:           p.Name,
 		CategoryID:     nullStringPtr(p.CategoryID),
@@ -451,7 +457,9 @@ func getProduct(db *sqlx.DB, id string, publishedOnly bool) (*models.Product, er
 		Images:         images,
 		Attributes:     fullAttrs,
 		Variants:       variants,
-	}, nil
+	}
+	ApplyProductListingPricing(full)
+	return full, nil
 }
 
 func nullStringPtr(ns sql.NullString) *string {
@@ -591,8 +599,8 @@ func UpsertProduct(db *sqlx.DB, p models.Product) error {
 				}
 			}
 			_, err := tx.Exec(
-				`INSERT INTO product_variants(id, product_id, sku, price, sale_price, quantity, attribute_values, image) VALUES(?,?,?,?,?,?,?,?)`,
-				v.ID, p.ID, v.SKU, v.Price, v.SalePrice, v.Quantity, string(b), imgPtr,
+				`INSERT INTO product_variants(id, product_id, sku, price, sale_price, compare_at_price, quantity, attribute_values, image) VALUES(?,?,?,?,?,?,?,?,?)`,
+				v.ID, p.ID, v.SKU, v.Price, v.SalePrice, v.CompareAtPrice, v.Quantity, string(b), imgPtr,
 			)
 			if err != nil {
 				return err

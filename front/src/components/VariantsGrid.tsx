@@ -38,7 +38,7 @@ const gridTheme = themeQuartz.withParams({
 });
 
 /* ─── Types ──────────────────────────────────────────────────────── */
-type ApplyField = "price" | "salePrice" | "quantity";
+type ApplyField = "price" | "salePrice" | "compareAtPrice" | "quantity";
 
 type GridCtx = {
   handleDelete: (id: string) => void;
@@ -305,6 +305,7 @@ export default function VariantsGrid({
       },
       numericApplyCol("price", "قیمت خرید", 150),
       numericApplyCol("salePrice", "قیمت فروش", 150),
+      numericApplyCol("compareAtPrice", "قیمت قبل تخفیف", 150),
       numericApplyCol("quantity", "تعداد", 120, {
         pinned: "left",
         lockPinned: true,
@@ -340,6 +341,7 @@ export default function VariantsGrid({
       sku: "",
       price: 0,
       salePrice: 0,
+      compareAtPrice: 0,
       quantity: 0,
       attributeValues: {},
     };
@@ -361,10 +363,16 @@ export default function VariantsGrid({
       const updated = { ...e.data } as ProductVariant;
       updated.price = Number(updated.price) || 0;
       updated.salePrice = Number(updated.salePrice) || 0;
+      updated.compareAtPrice = Number(updated.compareAtPrice) || 0;
       updated.quantity = Number(updated.quantity) || 0;
 
       const colId = e.column.getColId();
-      if (colId === "price" || colId === "salePrice" || colId === "quantity") {
+      if (
+        colId === "price" ||
+        colId === "salePrice" ||
+        colId === "compareAtPrice" ||
+        colId === "quantity"
+      ) {
         lastFieldValuesRef.current[colId] = updated[colId];
         gridRef.current?.api?.refreshHeader();
       }

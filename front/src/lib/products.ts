@@ -49,6 +49,8 @@ export type ProductVariant = {
   price: number;
   /** قیمت فروش — selling price */
   salePrice: number;
+  /** قیمت قبل تخفیف — customer-facing original price for discount badge */
+  compareAtPrice?: number;
   quantity: number;
   attributeValues: Record<string, string>;
   /** Selling-price image path relative to API, e.g. assets/product/xxx.jpg */
@@ -67,6 +69,11 @@ export type Product = {
   images?: string[];
   attributes: ProductAttribute[];
   variants: ProductVariant[];
+  /** Lowest customer-facing price (from API) */
+  displayPrice?: number;
+  compareAtPrice?: number;
+  discountPercent?: number;
+  onSale?: boolean;
 };
 
 export const cloneProductForCreate = (product: Product): Product => ({
@@ -103,11 +110,54 @@ export const productMaxPrice = (p: Product): number =>
 export const productTotalStock = (p: Product): number =>
   p.variants.reduce((sum, v) => sum + v.quantity, 0);
 
+export const variantDisplayPrice = (v: ProductVariant): number =>
+  v.salePrice > 0 ? v.salePrice : v.price;
+
+export const variantDiscountPercent = (v: ProductVariant): number => {
+  const display = variantDisplayPrice(v);
+  const compare = v.compareAtPrice || 0;
+  if (compare <= 0 || display <= 0 || compare <= display) return 0;
+  return Math.round(((compare - display) * 100) / compare);
+};
+
+export const productDiscountPercent = (p: Product): number => {
+  if (p.discountPercent && p.discountPercent > 0) return p.discountPercent;
+  let max = 0;
+  for (const v of p.variants) {
+    max = Math.max(max, variantDiscountPercent(v));
+  }
+  return max;
+};
+
+export const productDisplayPrice = (p: Product): number => {
+  if (p.displayPrice && p.displayPrice > 0) return p.displayPrice;
+  const prices = p.variants
+    .map(variantDisplayPrice)
+    .filter((n) => n > 0);
+  return prices.length ? Math.min(...prices) : 0;
+};
+
+export const productCompareAtPrice = (p: Product): number => {
+  if (p.compareAtPrice && p.compareAtPrice > 0) return p.compareAtPrice;
+  const display = productDisplayPrice(p);
+  for (const v of p.variants) {
+    if (variantDisplayPrice(v) === display && (v.compareAtPrice || 0) > display) {
+      return v.compareAtPrice || 0;
+    }
+  }
+  return 0;
+};
+
+export const productOnSale = (p: Product): boolean =>
+  !!p.onSale || productDiscountPercent(p) > 0;
+
 /** e.g. "۱۵۰٬۰۰۰ – ۳۲۰٬۰۰۰"  or a single value when min === max */
 export const productPriceRange = (p: Product): string => {
   if (!p.variants.length) return "—";
-  const min = productMinPrice(p);
-  const max = productMaxPrice(p);
+  const prices = p.variants.map(variantDisplayPrice).filter((n) => n > 0);
+  if (!prices.length) return "—";
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
   if (min === max) return min.toLocaleString("fa-IR");
   return `${min.toLocaleString("fa-IR")} – ${max.toLocaleString("fa-IR")}`;
 };

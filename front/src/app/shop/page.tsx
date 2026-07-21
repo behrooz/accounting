@@ -4,11 +4,16 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   getProducts,
+  productCompareAtPrice,
+  productDiscountPercent,
+  productDisplayPrice,
+  productOnSale,
   productPriceRange,
   productTotalStock,
   type Product,
 } from "@/lib/products";
 import { mediaUrl } from "@/lib/media";
+import ProductDiscountBadge from "@/components/ProductDiscountBadge";
 
 const PLACEHOLDER =
   "https://images.unsplash.com/photo-1520975919572-9aebc6a48b6b?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=4c1b8f9b1b7d6b0b1f2a9d6e2c8f7f4a";
@@ -75,10 +80,10 @@ export default function ShopHomePage() {
             const priceRange = productPriceRange(product);
             const stock = productTotalStock(product);
             const attrNames = product.attributes.map((a) => a.name).join("، ");
-
-            const onSale = product.variants.some(
-              (v) => v.salePrice && v.salePrice < v.price,
-            );
+            const discount = productDiscountPercent(product);
+            const displayPrice = productDisplayPrice(product);
+            const compareAt = productCompareAtPrice(product);
+            const onSale = productOnSale(product);
 
             return (
               <article
@@ -92,11 +97,7 @@ export default function ShopHomePage() {
                       alt={product.name}
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
-                    {onSale && (
-                      <span className="absolute left-2 top-2 rounded bg-red-500 px-2 py-1 text-xs font-semibold text-white">
-                        تخفیف
-                      </span>
-                    )}
+                    <ProductDiscountBadge percent={discount} />
                   </div>
                 </Link>
 
@@ -113,8 +114,17 @@ export default function ShopHomePage() {
                   <div className="mt-3 flex items-end justify-between gap-3">
                     <div>
                       <div className="text-sm text-[#545b64]">قیمت</div>
-                      <div className="text-lg font-semibold text-[#16191f]">
-                        {priceRange}{" "}
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        {onSale && compareAt > displayPrice ? (
+                          <span className="text-sm text-[#879596] line-through">
+                            {compareAt.toLocaleString("fa-IR")}
+                          </span>
+                        ) : null}
+                        <span className="text-lg font-semibold text-[#16191f]">
+                          {onSale
+                            ? displayPrice.toLocaleString("fa-IR")
+                            : priceRange}
+                        </span>
                         <span className="text-sm font-normal text-[#879596]">
                           تومان
                         </span>
