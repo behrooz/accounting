@@ -102,10 +102,7 @@ func CountProducts(db *sqlx.DB, f ProductListFilter) (int, error) {
 		args = append(args, like, like)
 	}
 	if strings.EqualFold(strings.TrimSpace(f.Sort), "sale") {
-		q += ` AND EXISTS (
-			SELECT 1 FROM product_variants v
-			WHERE v.product_id = p.id AND v.sale_price > 0
-		)`
+		q += " AND " + onSaleProductExistsSQL
 	}
 	q += publishedOnlyClause(f.PublishedOnly)
 
@@ -152,10 +149,7 @@ func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
 		sortKey = "new"
 	}
 	if sortKey == "sale" {
-		q += ` AND EXISTS (
-			SELECT 1 FROM product_variants v
-			WHERE v.product_id = p.id AND v.sale_price > 0
-		)`
+		q += " AND " + onSaleProductExistsSQL
 	}
 	q += publishedOnlyClause(f.PublishedOnly)
 
@@ -165,8 +159,10 @@ func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
 		WHERE v.product_id = p.id AND (v.sale_price > 0 OR v.price > 0)
 	), 0)`
 	switch sortKey {
-	case "price-asc", "sale":
+	case "price-asc":
 		q += " ORDER BY " + effectivePrice + " ASC, p.updated_at DESC, p.id DESC"
+	case "sale":
+		q += " ORDER BY " + maxDiscountPercentSQL + " DESC, " + effectivePrice + " ASC, p.updated_at DESC, p.id DESC"
 	case "price-desc":
 		q += " ORDER BY " + effectivePrice + " DESC, p.updated_at DESC, p.id DESC"
 	default:

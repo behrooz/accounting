@@ -988,6 +988,12 @@
     if (!$grid.length) return;
 
     var list = getProducts();
+    var params = shopListParams();
+    if (params.sort === "sale" || window.location.hash === "#sale") {
+      list = list.filter(function (p) {
+        return !!(p.onSale || (Number(p.discountPercent) || 0) > 0);
+      });
+    }
     if (shopInStockOnly()) {
       list = list.filter(function (p) {
         return !productIsOutOfStock(p);
@@ -997,7 +1003,11 @@
     $grid.html(list.map(productCard).join(""));
     $("#shopEmpty").prop("hidden", list.length > 0);
     if (list.length === 0) {
-      $("#shopEmpty").text("محصولی پیدا نشد.");
+      $("#shopEmpty").text(
+        params.sort === "sale" || window.location.hash === "#sale"
+          ? "فعلاً محصول تخفیف‌داری موجود نیست."
+          : "محصولی پیدا نشد."
+      );
     }
   }
 
@@ -2077,6 +2087,12 @@
     injectHomeJsonLd();
     loadCategories();
     loadProducts();
+
+    $(window).on("hashchange.shop", function () {
+      if ($("#shopProducts").length) {
+        loadShopProducts(true);
+      }
+    });
 
     $(window).off("scroll.products").on("scroll.products", function () {
       var viewportBottom = $(window).scrollTop() + $(window).height();

@@ -2,6 +2,31 @@ package repo
 
 import "accounting-api/internal/models"
 
+// SQL helpers for storefront sale/discount filters.
+const (
+	variantDisplayPriceSQL = `CASE WHEN v.sale_price > 0 THEN v.sale_price ELSE v.price END`
+	onSaleProductExistsSQL   = `EXISTS (
+  SELECT 1 FROM product_variants v
+  WHERE v.product_id = p.id
+    AND v.compare_at_price > 0
+    AND (` + variantDisplayPriceSQL + `) > 0
+    AND v.compare_at_price > (` + variantDisplayPriceSQL + `)
+)`
+	maxDiscountPercentSQL = `COALESCE((
+  SELECT MAX(
+    CASE
+      WHEN v.compare_at_price > 0
+        AND (` + variantDisplayPriceSQL + `) > 0
+        AND v.compare_at_price > (` + variantDisplayPriceSQL + `)
+      THEN FLOOR((v.compare_at_price - (` + variantDisplayPriceSQL + `)) * 100 / v.compare_at_price)
+      ELSE 0
+    END
+  )
+  FROM product_variants v
+  WHERE v.product_id = p.id
+), 0)`
+)
+
 func variantDisplayPrice(v models.ProductVariant) int64 {
 	if v.SalePrice > 0 {
 		return v.SalePrice
