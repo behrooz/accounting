@@ -61,24 +61,6 @@ func FindCustomerByPhone(db *sqlx.DB, phone string) (*models.Customer, error) {
 	return &c, nil
 }
 
-func resolveShipping(method string, fee int64) (string, int64) {
-	m := strings.TrimSpace(method)
-	switch m {
-	case "tipax":
-		return "تیپاکس (کرایه در مقصد)", 0
-	case "pishtaz", "":
-		if fee <= 0 {
-			fee = 149000
-		}
-		return "پست پیشتاز", fee
-	default:
-		if fee < 0 {
-			fee = 0
-		}
-		return m, fee
-	}
-}
-
 func resolvePayment(method string) string {
 	switch strings.TrimSpace(method) {
 	case "zarinpal":
@@ -110,7 +92,10 @@ func CreateStorefrontOrder(db *sqlx.DB, req CheckoutRequest) (*models.Invoice, e
 		return nil, errors.New("items required")
 	}
 
-	shipLabel, shipFee := resolveShipping(req.ShippingMethod, req.ShippingFee)
+	shipLabel, shipFee, err := ResolveCheckoutShipping(db, req.ShippingMethod, req.ShippingFee)
+	if err != nil {
+		return nil, errors.New("روش ارسال نامعتبر است")
+	}
 	payLabel := resolvePayment(req.PaymentMethod)
 
 	lines := make([]models.InvoiceItem, 0, len(req.Items))

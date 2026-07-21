@@ -57,6 +57,9 @@ func main() {
 	if err := repo.EnsureShopSettings(database); err != nil {
 		panic(err)
 	}
+	if err := repo.EnsureShippingMethods(database); err != nil {
+		panic(err)
+	}
 	_ = repo.EnsureStoreOTPTable(database)
 	_ = repo.EnsureStockAlertTable(database)
 
@@ -247,6 +250,14 @@ func main() {
 			return
 		}
 		c.JSON(http.StatusOK, s)
+	})
+	api.GET("/store/shipping-methods", httpx.CachePublic(300), func(c *gin.Context) {
+		methods, err := repo.ListShippingMethods(database, true)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		c.JSON(http.StatusOK, methods)
 	})
 	api.GET("/store/sitemap.xml", httpx.CachePublic(3600), func(c *gin.Context) {
 		origin := strings.TrimSpace(c.Query("origin"))
@@ -588,6 +599,31 @@ func main() {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+	authed.GET("/shipping-methods", func(c *gin.Context) {
+		methods, err := repo.ListShippingMethods(database, false)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		c.JSON(http.StatusOK, methods)
+	})
+	authed.PUT("/shipping-methods", func(c *gin.Context) {
+		var body []repo.ShippingMethod
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		if err := repo.ReplaceShippingMethods(database, body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		methods, err := repo.ListShippingMethods(database, false)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
+			return
+		}
+		c.JSON(http.StatusOK, methods)
 	})
 
 	// Product image upload → assets/product/<file>, DB stores relative path

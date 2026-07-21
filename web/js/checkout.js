@@ -63,6 +63,106 @@
     };
   }
 
+  function shippingOptionLabel(method) {
+    var name = method.name || "ارسال";
+    if (method.payAtDestination) {
+      return "<strong>" + name + "</strong>";
+    }
+    if (Number(method.fee) > 0) {
+      return (
+        "<strong>" +
+        name +
+        ': <b class="fee">' +
+        Number(method.fee).toLocaleString("fa-IR") +
+        " تومان</b></strong>"
+      );
+    }
+    return "<strong>" + name + "</strong>";
+  }
+
+  function renderShippingOptions(methods) {
+    var $wrap = $("#shippingOptions");
+    if (!$wrap.length) return;
+
+    if (!methods || !methods.length) {
+      $wrap.html('<p class="checkout-error">روش ارسالی تعریف نشده است.</p>');
+      return;
+    }
+
+    $wrap.html(
+      methods
+        .map(function (method, index) {
+          var fee = method.payAtDestination ? 0 : Number(method.fee) || 0;
+          return (
+            '<label class="ship-option">' +
+            '<input type="radio" name="shipping" value="' +
+            method.id +
+            '" data-fee="' +
+            fee +
+            '"' +
+            (index === 0 ? " checked" : "") +
+            " />" +
+            "<span>" +
+            shippingOptionLabel(method) +
+            (method.deliveryNote
+              ? "<small>" + method.deliveryNote + "</small>"
+              : "") +
+            "</span></label>"
+          );
+        })
+        .join("")
+    );
+  }
+
+  function loadShippingMethods() {
+    return $.ajax({
+      url: apiBase() + "/store/shipping-methods",
+      method: "GET",
+      dataType: "json"
+    })
+      .then(function (rows) {
+        var methods = Array.isArray(rows) ? rows : [];
+        if (!methods.length) {
+          methods = [
+            {
+              id: "pishtaz",
+              name: "پست پیشتاز",
+              deliveryNote: "تحویل ۳ تا ۷ روز کاری",
+              fee: 149000,
+              payAtDestination: false
+            },
+            {
+              id: "tipax",
+              name: "تیپاکس (کرایه در مقصد)",
+              deliveryNote: "تحویل ۲ تا ۳ روز کاری",
+              fee: 0,
+              payAtDestination: true
+            }
+          ];
+        }
+        renderShippingOptions(methods);
+        return methods;
+      })
+      .fail(function () {
+        renderShippingOptions([
+          {
+            id: "pishtaz",
+            name: "پست پیشتاز",
+            deliveryNote: "تحویل ۳ تا ۷ روز کاری",
+            fee: 149000,
+            payAtDestination: false
+          },
+          {
+            id: "tipax",
+            name: "تیپاکس (کرایه در مقصد)",
+            deliveryNote: "تحویل ۲ تا ۳ روز کاری",
+            fee: 0,
+            payAtDestination: true
+          }
+        ]);
+      });
+  }
+
   function renderOrder(items) {
     var sub = cartTotal(items);
     var ship = selectedShipping();
@@ -176,7 +276,10 @@
     }
     $("#checkoutEmpty").prop("hidden", true);
     $("#checkoutPageForm").prop("hidden", false);
-    renderOrder(items);
+
+    loadShippingMethods().always(function () {
+      renderOrder(items);
+    });
 
     var session = window.AberangAuth ? AberangAuth.getSession() : null;
     var lastPhone =

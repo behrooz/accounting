@@ -129,22 +129,11 @@
             </tfoot>
           </table>
 
-          <div class="ship-box">
-            <p class="ship-title">مرسوله ۱: <a href="#ship">روش ارسال را بخوانید و انتخاب کنید!</a></p>
-            <label class="ship-option">
-              <input type="radio" name="shipping" value="pishtaz" data-fee="149000" checked />
-              <span>
-                <strong>پست پیشتاز: <b class="fee">۱۴۹٬۰۰۰ تومان</b></strong>
-                <small>تحویل ۳ تا ۷ روز کاری</small>
-              </span>
-            </label>
-            <label class="ship-option">
-              <input type="radio" name="shipping" value="tipax" data-fee="0" />
-              <span>
-                <strong>تیپاکس (کرایه در مقصد)</strong>
-                <small>تحویل ۲ تا ۳ روز کاری</small>
-              </span>
-            </label>
+          <div class="ship-box" id="shipBox">
+            <p class="ship-title">مرسوله ۱: <a href="shipping.html">روش ارسال را بخوانید و انتخاب کنید!</a></p>
+            <div id="shippingOptions">
+              <p class="cat-loading">در حال بارگذاری روش‌های ارسال…</p>
+            </div>
           </div>
 
           <div class="order-total-row">
@@ -204,7 +193,7 @@
   <script src="js/config.js?v=29"></script>
   <script src="js/data.js?v=10"></script>
   <script src="js/auth.js?v=23"></script>
-  <script src="js/main.js?v=29"></script>
-  <script src="js/checkout.js?v=23"></script>
+  <script src="js/main.js?v=35"></script>
+  <script src="js/checkout.js?v=24"></script>
 </body>
 </html>
