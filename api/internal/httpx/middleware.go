@@ -17,6 +17,31 @@ type SessionUser struct {
 	Role     string `json:"role"`
 }
 
+// OptionalAuth attaches the session user when a valid Bearer token is present.
+// Missing or invalid tokens are ignored so public routes keep working.
+func OptionalAuth(jwtSecret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		h := c.GetHeader("Authorization")
+		if h == "" || !strings.HasPrefix(strings.ToLower(h), "bearer ") {
+			c.Next()
+			return
+		}
+		token := strings.TrimSpace(h[len("Bearer "):])
+		claims, err := auth.Parse(jwtSecret, token)
+		if err != nil {
+			c.Next()
+			return
+		}
+		c.Set(CtxUserKey, SessionUser{ID: claims.UserID, Username: claims.Username, Role: claims.Role})
+		c.Next()
+	}
+}
+
+func HasAuth(c *gin.Context) bool {
+	_, ok := c.Get(CtxUserKey)
+	return ok
+}
+
 func AuthRequired(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		h := c.GetHeader("Authorization")

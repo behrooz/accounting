@@ -61,6 +61,8 @@ export type Product = {
   name: string;
   /** Optional product category (storefront / filtering) */
   categoryId?: string | null;
+  /** When false, product is hidden from the public storefront */
+  publishedOnWeb?: boolean;
   /** Gallery image paths under assets/product (not base64) */
   images?: string[];
   attributes: ProductAttribute[];
@@ -71,6 +73,7 @@ export const cloneProductForCreate = (product: Product): Product => ({
   ...product,
   id: crypto.randomUUID(),
   name: `${product.name} (کپی)`,
+  publishedOnWeb: false,
   images: [...(product.images ?? [])],
   attributes: product.attributes.map((attr) => ({
     ...attr,

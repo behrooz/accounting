@@ -190,6 +190,7 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
     const base: Product = {
       ...initialProduct,
       images: initialProduct.images ?? [],
+      publishedOnWeb: initialProduct.publishedOnWeb ?? !isNew,
     };
     return repairProductVariants(base);
   });
@@ -399,6 +400,7 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
         ...product,
         name: trimmed,
         categoryId: product.categoryId || null,
+        publishedOnWeb: !!product.publishedOnWeb,
         images: product.images ?? [],
         attributes: product.attributes.map((a) => ({
           ...a,
@@ -528,6 +530,29 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="flex flex-col gap-1.5 sm:col-span-2">
+            <span className="text-xs font-medium text-[#545b64]">
+              انتشار در وب‌سایت
+            </span>
+            <label className="flex cursor-pointer items-center gap-3 rounded border border-[#d5dbdb] bg-[#f8f9f9] px-3 py-2.5">
+              <input
+                type="checkbox"
+                checked={!!product.publishedOnWeb}
+                onChange={(e) =>
+                  setProduct((p) => ({
+                    ...p,
+                    publishedOnWeb: e.target.checked,
+                  }))
+                }
+                className="h-4 w-4 rounded border-[#aab7b8] text-[#0073bb] focus:ring-[#0073bb]"
+              />
+              <span className="text-sm text-[#16191f]">
+                {product.publishedOnWeb
+                  ? "محصول در فروشگاه آنلاین نمایش داده می‌شود"
+                  : "محصول فقط در پنل مدیریت دیده می‌شود (مخفی در وب)"}
+              </span>
+            </label>
           </label>
         </div>
       </section>

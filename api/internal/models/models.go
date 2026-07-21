@@ -14,12 +14,13 @@ type User struct {
 }
 
 type Product struct {
-	ID         string             `json:"id"`
-	Name       string             `json:"name"`
-	CategoryID *string            `json:"categoryId,omitempty"`
-	Images     []string           `json:"images,omitempty"`
-	Attributes []ProductAttribute `json:"attributes"`
-	Variants   []ProductVariant   `json:"variants"`
+	ID              string             `json:"id"`
+	Name            string             `json:"name"`
+	CategoryID      *string            `json:"categoryId,omitempty"`
+	PublishedOnWeb  bool               `json:"publishedOnWeb"`
+	Images          []string           `json:"images,omitempty"`
+	Attributes      []ProductAttribute `json:"attributes"`
+	Variants        []ProductVariant   `json:"variants"`
 }
 
 type ProductCategory struct {

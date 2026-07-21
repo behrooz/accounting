@@ -10,6 +10,7 @@ function makeEmptyProduct(): Product {
     id: crypto.randomUUID(),
     name: "",
     categoryId: null,
+    publishedOnWeb: false,
     images: [],
     attributes: [],
     variants: [

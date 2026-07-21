@@ -145,7 +145,7 @@ func main() {
 	})
 
 	// ── Storefront public (no JWT) — catalog + checkout + phone-based addresses ──
-	api.GET("/products", func(c *gin.Context) {
+	api.GET("/products", httpx.OptionalAuth(cfg.JWTSecret), func(c *gin.Context) {
 		includeTotal := strings.EqualFold(c.Query("includeTotal"), "true")
 		if !includeTotal {
 			c.Header("Cache-Control", "public, max-age=30, stale-while-revalidate=60")
@@ -166,6 +166,7 @@ func main() {
 			Specification: c.Query("spec"),
 			Limit:         limit,
 			Offset:        offset,
+			PublishedOnly: !httpx.HasAuth(c),
 		}
 		ps, err := repo.ListProducts(database, filter)
 		if err != nil {
@@ -188,8 +189,16 @@ func main() {
 		}
 		c.JSON(http.StatusOK, ps)
 	})
-	api.GET("/products/:id", httpx.CachePublic(30), func(c *gin.Context) {
-		p, err := repo.GetProduct(database, c.Param("id"))
+	api.GET("/products/:id", httpx.OptionalAuth(cfg.JWTSecret), httpx.CachePublic(30), func(c *gin.Context) {
+		var (
+			p   *models.Product
+			err error
+		)
+		if httpx.HasAuth(c) {
+			p, err = repo.GetProduct(database, c.Param("id"))
+		} else {
+			p, err = repo.GetPublishedProduct(database, c.Param("id"))
+		}
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return

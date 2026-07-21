@@ -125,7 +125,7 @@ func CreateStorefrontOrder(db *sqlx.DB, req CheckoutRequest) (*models.Invoice, e
 			return nil, errors.New("productId and variantId required per item")
 		}
 
-		p, err := GetProduct(db, raw.ProductID)
+		p, err := GetPublishedProduct(db, raw.ProductID)
 		if err != nil {
 			return nil, fmt.Errorf("product not found: %s", raw.ProductID)
 		}

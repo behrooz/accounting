@@ -14,9 +14,10 @@ import (
 )
 
 type productRow struct {
-	ID         string         `db:"id"`
-	Name       string         `db:"name"`
-	CategoryID sql.NullString `db:"category_id"`
+	ID             string         `db:"id"`
+	Name           string         `db:"name"`
+	CategoryID     sql.NullString `db:"category_id"`
+	PublishedOnWeb bool           `db:"published_on_web"`
 }
 
 type attrRow struct {
@@ -52,13 +53,21 @@ type varRow struct {
 }
 
 type ProductListFilter struct {
-	Sort          string // new | price-asc | price-desc | sale
-	CategoryID    string
-	CategorySlug  string
-	Query         string
-	Specification string
-	Limit         int
-	Offset        int
+	Sort           string // new | price-asc | price-desc | sale
+	CategoryID     string
+	CategorySlug   string
+	Query          string
+	Specification  string
+	Limit          int
+	Offset         int
+	PublishedOnly  bool // storefront: only products released on web
+}
+
+func publishedOnlyClause(publishedOnly bool) string {
+	if publishedOnly {
+		return " AND p.published_on_web = 1"
+	}
+	return ""
 }
 
 func CountProducts(db *sqlx.DB, f ProductListFilter) (int, error) {
@@ -97,6 +106,7 @@ func CountProducts(db *sqlx.DB, f ProductListFilter) (int, error) {
 			WHERE v.product_id = p.id AND v.sale_price > 0
 		)`
 	}
+	q += publishedOnlyClause(f.PublishedOnly)
 
 	var total int
 	if err := db.Get(&total, q, args...); err != nil {
@@ -107,7 +117,7 @@ func CountProducts(db *sqlx.DB, f ProductListFilter) (int, error) {
 
 func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
 	q := `
-		SELECT p.id, p.name, p.category_id
+		SELECT p.id, p.name, p.category_id, p.published_on_web
 		FROM products p
 		LEFT JOIN product_categories c ON c.id = p.category_id
 		WHERE 1=1`
@@ -146,6 +156,7 @@ func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
 			WHERE v.product_id = p.id AND v.sale_price > 0
 		)`
 	}
+	q += publishedOnlyClause(f.PublishedOnly)
 
 	effectivePrice := `COALESCE((
 		SELECT MIN(CASE WHEN v.sale_price > 0 THEN v.sale_price ELSE v.price END)
@@ -179,10 +190,13 @@ func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
 	return loadProductsBatch(db, ps)
 }
 
-// ListProductIDs returns product ids for sitemaps and other lightweight listings.
+// ListProductIDs returns published product ids for sitemaps and other lightweight listings.
 func ListProductIDs(db *sqlx.DB) ([]string, error) {
 	var ids []string
-	err := db.Select(&ids, `SELECT id FROM products ORDER BY updated_at DESC, id DESC`)
+	err := db.Select(&ids, `
+		SELECT id FROM products
+		WHERE published_on_web = 1
+		ORDER BY updated_at DESC, id DESC`)
 	return ids, err
 }
 
@@ -301,12 +315,13 @@ func loadProductsBatch(db *sqlx.DB, ps []productRow) ([]models.Product, error) {
 			})
 		}
 		out = append(out, models.Product{
-			ID:         p.ID,
-			Name:       p.Name,
-			CategoryID: nullStringPtr(p.CategoryID),
-			Images:     imgsByProduct[p.ID],
-			Attributes: fullAttrs,
-			Variants:   variantsByProduct[p.ID],
+			ID:             p.ID,
+			Name:           p.Name,
+			CategoryID:     nullStringPtr(p.CategoryID),
+			PublishedOnWeb: p.PublishedOnWeb,
+			Images:         imgsByProduct[p.ID],
+			Attributes:     fullAttrs,
+			Variants:       variantsByProduct[p.ID],
 		})
 	}
 	return out, nil
@@ -337,8 +352,20 @@ type imgRow struct {
 }
 
 func GetProduct(db *sqlx.DB, id string) (*models.Product, error) {
+	return getProduct(db, id, false)
+}
+
+func GetPublishedProduct(db *sqlx.DB, id string) (*models.Product, error) {
+	return getProduct(db, id, true)
+}
+
+func getProduct(db *sqlx.DB, id string, publishedOnly bool) (*models.Product, error) {
+	q := "SELECT id, name, category_id, published_on_web FROM products WHERE id=? LIMIT 1"
+	if publishedOnly {
+		q = "SELECT id, name, category_id, published_on_web FROM products WHERE id=? AND published_on_web = 1 LIMIT 1"
+	}
 	var p productRow
-	if err := db.Get(&p, "SELECT id, name, category_id FROM products WHERE id=? LIMIT 1", id); err != nil {
+	if err := db.Get(&p, q, id); err != nil {
 		return nil, err
 	}
 
@@ -417,12 +444,13 @@ func GetProduct(db *sqlx.DB, id string) (*models.Product, error) {
 	}
 
 	return &models.Product{
-		ID:         p.ID,
-		Name:       p.Name,
-		CategoryID: nullStringPtr(p.CategoryID),
-		Images:     images,
-		Attributes: fullAttrs,
-		Variants:   variants,
+		ID:             p.ID,
+		Name:           p.Name,
+		CategoryID:     nullStringPtr(p.CategoryID),
+		PublishedOnWeb: p.PublishedOnWeb,
+		Images:         images,
+		Attributes:     fullAttrs,
+		Variants:       variants,
 	}, nil
 }
 
@@ -490,9 +518,9 @@ func newID() string {
 func UpsertProduct(db *sqlx.DB, p models.Product) error {
 	return WithTx(db, func(tx *sqlx.Tx) error {
 		_, err := tx.Exec(
-			`INSERT INTO products(id, name, category_id) VALUES(?,?,?)
-			 ON DUPLICATE KEY UPDATE name=VALUES(name), category_id=VALUES(category_id)`,
-			p.ID, p.Name, p.CategoryID,
+			`INSERT INTO products(id, name, category_id, published_on_web) VALUES(?,?,?,?)
+			 ON DUPLICATE KEY UPDATE name=VALUES(name), category_id=VALUES(category_id), published_on_web=VALUES(published_on_web)`,
+			p.ID, p.Name, p.CategoryID, p.PublishedOnWeb,
 		)
 		if err != nil {
 			return err
@@ -634,7 +662,7 @@ type OptionStock struct {
 
 // GetProductStock returns per-variant and per-option quantities for a product.
 func GetProductStock(db *sqlx.DB, id string) (*ProductStock, error) {
-	p, err := GetProduct(db, id)
+	p, err := GetPublishedProduct(db, id)
 	if err != nil {
 		return nil, err
 	}

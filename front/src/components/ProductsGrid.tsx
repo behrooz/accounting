@@ -128,6 +128,19 @@ const COLUMN_DEFS: ColDef<Product>[] = [
     filter: false,
   },
   {
+    headerName: "انتشار در وب",
+    valueGetter: (p) => (p.data?.publishedOnWeb ? 1 : 0),
+    editable: false,
+    width: 120,
+    sortable: true,
+    resizable: true,
+    filter: "agSetColumnFilter",
+    filterParams: { values: [0, 1] },
+    valueFormatter: (p) => (p.value ? "منتشر" : "مخفی"),
+    cellClass: (p) =>
+      p.value ? "text-[#1d6f42] font-medium" : "text-[#879596]",
+  },
+  {
     headerName: "موجودی کل",
     valueGetter: (p) => (p.data ? productTotalStock(p.data) : 0),
     editable: false,
