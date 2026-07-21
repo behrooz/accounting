@@ -114,6 +114,10 @@ env:
     value: "434229"
   - name: SMS_IR_PARAM_NAME
     value: "CODE"
+  - name: SMS_IR_STOCK_TEMPLATE_ID
+    value: "0"
+  - name: SMS_IR_STOCK_PARAM_PRODUCT
+    value: "PRODUCT"
   # Example: load from Secret instead of plain value
   # - name: MYSQL_DSN
   #   valueFrom:

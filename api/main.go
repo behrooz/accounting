@@ -58,11 +58,22 @@ func main() {
 		panic(err)
 	}
 	_ = repo.EnsureStoreOTPTable(database)
+	_ = repo.EnsureStockAlertTable(database)
 
 	smsClient := &smsir.Client{
 		APIKey:     cfg.SMSIRAPIKey,
 		TemplateID: cfg.SMSIRTemplateID,
 		ParamName:  cfg.SMSIRParamName,
+	}
+	stockSMS := repo.StockSMSConfig{
+		TemplateID: cfg.SMSIRStockTemplateID,
+		ParamName:  cfg.SMSIRStockParamProduct,
+	}
+	notifyRestock := func(productID string, restocked []string) {
+		if len(restocked) == 0 {
+			return
+		}
+		go repo.ProcessStockAlerts(database, smsClient, stockSMS, productID, restocked)
 	}
 
 	// seed default admin (admin / 123456)
@@ -212,6 +223,21 @@ func main() {
 			return
 		}
 		c.JSON(http.StatusOK, stock)
+	})
+	api.POST("/store/stock-alerts", func(c *gin.Context) {
+		var body repo.StockAlertRequest
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		if err := repo.SubscribeStockAlert(database, body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{
+			"ok":      true,
+			"message": "درخواست شما ثبت شد. وقتی موجود شد از طریق پیامک اطلاع می‌دهیم.",
+		})
 	})
 	// Public shop profile for storefront footer / contact / eNamad pages
 	api.GET("/store/shop", httpx.CachePublic(300), func(c *gin.Context) {
@@ -721,10 +747,12 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
 			return
 		}
-		if err := repo.UpsertProduct(database, p); err != nil {
+		restocked, err := repo.UpsertProductWithRestock(database, p)
+		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		notifyRestock(p.ID, restocked)
 		c.JSON(http.StatusCreated, gin.H{"ok": true})
 	})
 	authed.PUT("/products/:id", func(c *gin.Context) {
@@ -734,10 +762,12 @@ func main() {
 			return
 		}
 		p.ID = c.Param("id")
-		if err := repo.UpsertProduct(database, p); err != nil {
+		restocked, err := repo.UpsertProductWithRestock(database, p)
+		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		notifyRestock(p.ID, restocked)
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 	authed.DELETE("/products/:id", func(c *gin.Context) {

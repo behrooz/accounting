@@ -1211,6 +1211,114 @@
     });
   }
 
+  function stockAlertDefaultPhone() {
+    var phone = "";
+    if (window.AberangAuth) {
+      var sess = AberangAuth.getSession();
+      if (sess && sess.phone) phone = sess.phone;
+      else if (typeof localStorage !== "undefined" && AberangAuth.PHONE_KEY) {
+        phone = localStorage.getItem(AberangAuth.PHONE_KEY) || "";
+      }
+    }
+    return phone;
+  }
+
+  function selectionIsOutOfStock(product) {
+    if (!product) return false;
+    var $page = $("#productPage");
+    if (!$page.length) return productIsOutOfStock(product);
+    var selection = collectProductSelection(product);
+    if (selection.variantId) {
+      var variant = (product.variants || []).find(function (v) {
+        return v.id === selection.variantId;
+      });
+      if (variant) return (Number(variant.quantity) || 0) <= 0;
+    }
+    return productIsOutOfStock(product);
+  }
+
+  function stockAlertHtml(product, allOos) {
+    var phone = stockAlertDefaultPhone();
+    var hidden = allOos ? "" : " hidden";
+    return (
+      '<div class="pdp-stock-alert' +
+      hidden +
+      '" id="pdpStockAlert">' +
+      '<p class="pdp-stock-alert-title">می‌خوای وقتی موجود شد SMS بدم و بگم که شارژ شده؟</p>' +
+      '<div class="pdp-stock-alert-row">' +
+      '<input type="tel" class="js-stock-alert-phone" placeholder="شماره موبایل ۰۹…" inputmode="tel" value="' +
+      escapeHtml(phone) +
+      '" />' +
+      '<button type="button" class="btn-red js-stock-alert-submit">ثبت درخواست</button>' +
+      "</div>" +
+      '<p class="pdp-stock-alert-msg js-stock-alert-msg" hidden></p>' +
+      "</div>"
+    );
+  }
+
+  function updateStockAlertVisibility(product) {
+    var $alert = $("#pdpStockAlert");
+    if (!$alert.length || !product) return;
+    if (productIsOutOfStock(product) || selectionIsOutOfStock(product)) {
+      $alert.removeClass("hidden");
+    } else {
+      $alert.addClass("hidden");
+    }
+  }
+
+  function submitStockAlert() {
+    var $page = $("#productPage");
+    var productId = String($page.find(".pdp").data("id") || queryParam("id") || "");
+    var product = findProduct(productId);
+    if (!product) return;
+
+    var phone = String($page.find(".js-stock-alert-phone").val() || "").trim();
+    if (!phone) {
+      alert("شماره موبایل را وارد کنید.");
+      return;
+    }
+
+    var selection = collectProductSelection(product);
+    var $msg = $page.find(".js-stock-alert-msg");
+    var $btn = $page.find(".js-stock-alert-submit");
+    var base = window.ABERANG_API_BASE_URL || "http://localhost:8080/api";
+
+    $btn.prop("disabled", true);
+    $msg.prop("hidden", true).removeClass("is-error is-success");
+
+    $.ajax({
+      url: base + "/store/stock-alerts",
+      method: "POST",
+      contentType: "application/json",
+      dataType: "json",
+      data: JSON.stringify({
+        productId: product.id,
+        variantId: selection.variantId || "",
+        phone: phone
+      })
+    })
+      .done(function (res) {
+        if (window.AberangAuth && AberangAuth.PHONE_KEY) {
+          try {
+            localStorage.setItem(AberangAuth.PHONE_KEY, phone);
+          } catch (e) {}
+        }
+        $msg
+          .text((res && res.message) || "درخواست شما ثبت شد.")
+          .addClass("is-success")
+          .prop("hidden", false);
+      })
+      .fail(function (xhr) {
+        var err =
+          (xhr.responseJSON && xhr.responseJSON.error) ||
+          "ثبت درخواست ناموفق بود.";
+        $msg.text(err).addClass("is-error").prop("hidden", false);
+      })
+      .always(function () {
+        $btn.prop("disabled", false);
+      });
+  }
+
   function renderProductPage(forced) {
     var $page = $("#productPage");
     if (!$page.length) return;
@@ -1364,9 +1472,7 @@
       '<button type="button" class="pdp-extra-link js-size-guide">' +
       '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h16v8H4z"/><path d="M8 8v3M12 8v5M16 8v3" stroke-linecap="round"/></svg>' +
       "<span>راهنمای اندازه (جدول سایز)</span></button>" +
-      '<label class="pdp-notify">' +
-      '<input type="checkbox" class="js-stock-notify" />' +
-      "<span>میخوای وقتی موجود شد SMS بدم و بگم که شارژ شده؟</span></label>" +
+      stockAlertHtml(product, allOos) +
       "</div>";
 
     var descBlock = product.desc
@@ -1498,6 +1604,7 @@
     );
 
     bindProductGallery($page, images);
+    updateStockAlertVisibility(product);
     loadRelatedProducts(product, true);
   }
 
@@ -2066,9 +2173,17 @@
       alert("جدول سایز به‌زودی اضافه می‌شود.");
     });
 
-    $(document).on("change", ".js-stock-notify", function () {
-      if (this.checked) {
-        alert("وقتی موجود شد به شما اطلاع می‌دهیم.");
+    $(document).on("click", ".js-stock-alert-submit", function () {
+      submitStockAlert();
+    });
+
+    $(document).on("click", ".js-color", function () {
+      var productId = String($("#productPage .pdp").data("id") || queryParam("id") || "");
+      var product = findProduct(productId);
+      if (product) {
+        setTimeout(function () {
+          updateStockAlertVisibility(product);
+        }, 0);
       }
     });
 
@@ -2080,6 +2195,13 @@
       }
       $btn.closest(".pdp-attr-swatches, .pdp-swatches").find(".js-attr").removeClass("is-active");
       $btn.addClass("is-active");
+      var productId = String($("#productPage .pdp").data("id") || queryParam("id") || "");
+      var product = findProduct(productId);
+      if (product) {
+        setTimeout(function () {
+          updateStockAlertVisibility(product);
+        }, 0);
+      }
     });
 
     $(document).on("click", ".js-qty-dec", function () {

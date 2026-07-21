@@ -18,15 +18,18 @@ type Config struct {
 	JWTSecret string
 
 	// sms.ir OTP (https://api.sms.ir/v1/send/verify)
-	SMSIRAPIKey     string
-	SMSIRTemplateID int
-	SMSIRParamName  string
+	SMSIRAPIKey            string
+	SMSIRTemplateID        int
+	SMSIRParamName         string
+	SMSIRStockTemplateID   int
+	SMSIRStockParamProduct string
 }
 
 func Load() Config {
 	_ = loadDotEnv(".env")
 
 	tmplID, _ := strconv.Atoi(getenv("SMS_IR_TEMPLATE_ID", "0"))
+	stockTmplID, _ := strconv.Atoi(getenv("SMS_IR_STOCK_TEMPLATE_ID", "0"))
 	maxOpen, _ := strconv.Atoi(getenv("MYSQL_MAX_OPEN_CONNS", "25"))
 	maxIdle, _ := strconv.Atoi(getenv("MYSQL_MAX_IDLE_CONNS", "0"))
 	cfg := Config{
@@ -40,6 +43,8 @@ func Load() Config {
 		SMSIRAPIKey:     getenv("SMS_IR_API_KEY", ""),
 		SMSIRTemplateID: tmplID,
 		SMSIRParamName:  getenv("SMS_IR_PARAM_NAME", "CODE"),
+		SMSIRStockTemplateID:   stockTmplID,
+		SMSIRStockParamProduct: getenv("SMS_IR_STOCK_PARAM_PRODUCT", "PRODUCT"),
 	}
 	return cfg
 }
