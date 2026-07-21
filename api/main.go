@@ -31,7 +31,7 @@ func main() {
 		panic(err)
 	}
 
-	database, err := db.Open(cfg.MySQLDSN)
+	database, err := db.Open(cfg.MySQLDSN, cfg.MySQLMaxOpen, cfg.MySQLMaxIdle)
 	if err != nil {
 		panic(err)
 	}
@@ -87,7 +87,7 @@ func main() {
 	api := r.Group("/api")
 
 	// Public categories (storefront)
-	api.GET("/categories", func(c *gin.Context) {
+	api.GET("/categories", httpx.CachePublic(300), func(c *gin.Context) {
 		rows, err := repo.ListCategories(database)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
@@ -146,9 +146,12 @@ func main() {
 
 	// ── Storefront public (no JWT) — catalog + checkout + phone-based addresses ──
 	api.GET("/products", func(c *gin.Context) {
+		includeTotal := strings.EqualFold(c.Query("includeTotal"), "true")
+		if !includeTotal {
+			c.Header("Cache-Control", "public, max-age=30, stale-while-revalidate=60")
+		}
 		limit, _ := strconv.Atoi(c.Query("limit"))
 		offset, _ := strconv.Atoi(c.Query("offset"))
-		includeTotal := strings.EqualFold(c.Query("includeTotal"), "true")
 		if includeTotal && limit <= 0 {
 			limit = 10
 		}
@@ -185,7 +188,7 @@ func main() {
 		}
 		c.JSON(http.StatusOK, ps)
 	})
-	api.GET("/products/:id", func(c *gin.Context) {
+	api.GET("/products/:id", httpx.CachePublic(30), func(c *gin.Context) {
 		p, err := repo.GetProduct(database, c.Param("id"))
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -193,7 +196,7 @@ func main() {
 		}
 		c.JSON(http.StatusOK, p)
 	})
-	api.GET("/store/products/:id/stock", func(c *gin.Context) {
+	api.GET("/store/products/:id/stock", httpx.CachePublic(15), func(c *gin.Context) {
 		stock, err := repo.GetProductStock(database, c.Param("id"))
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -202,7 +205,7 @@ func main() {
 		c.JSON(http.StatusOK, stock)
 	})
 	// Public shop profile for storefront footer / contact / eNamad pages
-	api.GET("/store/shop", func(c *gin.Context) {
+	api.GET("/store/shop", httpx.CachePublic(300), func(c *gin.Context) {
 		s, err := repo.GetShopSettings(database)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "server error"})
@@ -210,7 +213,7 @@ func main() {
 		}
 		c.JSON(http.StatusOK, s)
 	})
-	api.GET("/store/sitemap.xml", func(c *gin.Context) {
+	api.GET("/store/sitemap.xml", httpx.CachePublic(3600), func(c *gin.Context) {
 		origin := strings.TrimSpace(c.Query("origin"))
 		if origin == "" {
 			origin = "https://abrangstyle.ir"

@@ -57,14 +57,14 @@ func BuildStorefrontSitemap(db *sqlx.DB, siteOrigin string) ([]byte, error) {
 		}
 	}
 
-	products, err := ListProducts(db, ProductListFilter{Sort: "new"})
+	products, err := ListProductIDs(db)
 	if err == nil {
-		for _, p := range products {
-			if strings.TrimSpace(p.ID) == "" {
+		for _, id := range products {
+			if strings.TrimSpace(id) == "" {
 				continue
 			}
 			urls = append(urls, SitemapURL{
-				Loc:        origin + "/product.html?id=" + url.QueryEscape(p.ID),
+				Loc:        origin + "/product.html?id=" + url.QueryEscape(id),
 				ChangeFreq: "weekly",
 				Priority:   "0.8",
 				LastMod:    today,

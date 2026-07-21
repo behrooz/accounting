@@ -12,7 +12,9 @@ type Config struct {
 	Port       string
 	CorsOrigin string
 
-	MySQLDSN  string
+	MySQLDSN       string
+	MySQLMaxOpen   int
+	MySQLMaxIdle   int
 	JWTSecret string
 
 	// sms.ir OTP (https://api.sms.ir/v1/send/verify)
@@ -25,11 +27,15 @@ func Load() Config {
 	_ = loadDotEnv(".env")
 
 	tmplID, _ := strconv.Atoi(getenv("SMS_IR_TEMPLATE_ID", "0"))
+	maxOpen, _ := strconv.Atoi(getenv("MYSQL_MAX_OPEN_CONNS", "25"))
+	maxIdle, _ := strconv.Atoi(getenv("MYSQL_MAX_IDLE_CONNS", "0"))
 	cfg := Config{
 		Env:             getenv("APP_ENV", "dev"),
 		Port:            getenv("APP_PORT", "8080"),
 		CorsOrigin:      getenv("APP_CORS_ORIGIN", "*"),
 		MySQLDSN:        getenv("MYSQL_DSN", ""),
+		MySQLMaxOpen:    maxOpen,
+		MySQLMaxIdle:    maxIdle,
 		JWTSecret:       getenv("JWT_SECRET", "change-me"),
 		SMSIRAPIKey:     getenv("SMS_IR_API_KEY", ""),
 		SMSIRTemplateID: tmplID,

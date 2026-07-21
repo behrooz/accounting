@@ -176,15 +176,139 @@ func ListProducts(db *sqlx.DB, f ProductListFilter) ([]models.Product, error) {
 	if err := db.Select(&ps, q, args...); err != nil {
 		return nil, err
 	}
-	out := make([]models.Product, 0, len(ps))
-	for _, p := range ps {
-		full, err := GetProduct(db, p.ID)
+	return loadProductsBatch(db, ps)
+}
+
+// ListProductIDs returns product ids for sitemaps and other lightweight listings.
+func ListProductIDs(db *sqlx.DB) ([]string, error) {
+	var ids []string
+	err := db.Select(&ids, `SELECT id FROM products ORDER BY updated_at DESC, id DESC`)
+	return ids, err
+}
+
+func loadProductsBatch(db *sqlx.DB, ps []productRow) ([]models.Product, error) {
+	if len(ps) == 0 {
+		return []models.Product{}, nil
+	}
+
+	ids := make([]string, len(ps))
+	for i, p := range ps {
+		ids[i] = p.ID
+	}
+
+	imgsByProduct := map[string][]string{}
+	imgQuery, imgArgs, err := sqlx.In(`
+		SELECT product_id, image
+		FROM product_images
+		WHERE product_id IN (?)
+		ORDER BY sort_order ASC`, ids)
+	if err != nil {
+		return nil, err
+	}
+	imgQuery = db.Rebind(imgQuery)
+	var imgRows []struct {
+		ProductID string `db:"product_id"`
+		Image     string `db:"image"`
+	}
+	if err := db.Select(&imgRows, imgQuery, imgArgs...); err != nil {
+		return nil, err
+	}
+	for _, row := range imgRows {
+		imgsByProduct[row.ProductID] = append(imgsByProduct[row.ProductID], row.Image)
+	}
+
+	attrQuery, attrArgs, err := sqlx.In(`
+		SELECT * FROM product_attributes
+		WHERE product_id IN (?)
+		ORDER BY sort_order ASC`, ids)
+	if err != nil {
+		return nil, err
+	}
+	attrQuery = db.Rebind(attrQuery)
+	var attrs []attrRow
+	if err := db.Select(&attrs, attrQuery, attrArgs...); err != nil {
+		return nil, err
+	}
+	attrsByProduct := map[string][]attrRow{}
+	attrIDs := make([]string, 0, len(attrs))
+	for _, a := range attrs {
+		attrsByProduct[a.ProductID] = append(attrsByProduct[a.ProductID], a)
+		attrIDs = append(attrIDs, a.ID)
+	}
+
+	optsByAttr := map[string][]models.AttributeOption{}
+	if len(attrIDs) > 0 {
+		optQuery, optArgs, err := sqlx.In(`
+			SELECT * FROM attribute_options
+			WHERE attribute_id IN (?)
+			ORDER BY sort_order ASC`, attrIDs)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, *full)
+		optQuery = db.Rebind(optQuery)
+		var opts []optRow
+		if err := db.Select(&opts, optQuery, optArgs...); err != nil {
+			return nil, err
+		}
+		for _, o := range opts {
+			optsByAttr[o.AttributeID] = append(optsByAttr[o.AttributeID], models.AttributeOption{ID: o.ID, Label: o.Label})
+		}
 	}
 
+	varQuery, varArgs, err := sqlx.In(`
+		SELECT * FROM product_variants
+		WHERE product_id IN (?)
+		ORDER BY created_at ASC`, ids)
+	if err != nil {
+		return nil, err
+	}
+	varQuery = db.Rebind(varQuery)
+	var variantsRows []varRow
+	if err := db.Select(&variantsRows, varQuery, varArgs...); err != nil {
+		return nil, err
+	}
+	variantsByProduct := map[string][]models.ProductVariant{}
+	for _, v := range variantsRows {
+		productAttrs := attrsByProduct[v.ProductID]
+		m := map[string]string{}
+		_ = json.Unmarshal([]byte(v.AttributeValues), &m)
+		m = normalizeAttributeValues(productAttrs, optsByAttr, m)
+		var img *string
+		if v.Image.Valid {
+			s := v.Image.String
+			img = &s
+		}
+		variantsByProduct[v.ProductID] = append(variantsByProduct[v.ProductID], models.ProductVariant{
+			ID:              v.ID,
+			SKU:             v.SKU,
+			Price:           v.Price,
+			SalePrice:       v.SalePrice,
+			Quantity:        v.Quantity,
+			AttributeValues: m,
+			Image:           img,
+		})
+	}
+
+	out := make([]models.Product, 0, len(ps))
+	for _, p := range ps {
+		fullAttrs := make([]models.ProductAttribute, 0, len(attrsByProduct[p.ID]))
+		for _, a := range attrsByProduct[p.ID] {
+			fullAttrs = append(fullAttrs, models.ProductAttribute{
+				ID:         a.ID,
+				Name:       a.Name,
+				AllowImage: a.AllowImage,
+				Options:    optsByAttr[a.ID],
+			})
+		}
+		out = append(out, models.Product{
+			ID:         p.ID,
+			Name:       p.Name,
+			CategoryID: nullStringPtr(p.CategoryID),
+			Images:     imgsByProduct[p.ID],
+			Attributes: fullAttrs,
+			Variants:   variantsByProduct[p.ID],
+		})
+	}
 	return out, nil
 }
 

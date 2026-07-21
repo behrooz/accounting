@@ -10,16 +10,25 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func Open(dsn string) (*sqlx.DB, error) {
+func Open(dsn string, maxOpen, maxIdle int) (*sqlx.DB, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("MYSQL_DSN is required")
+	}
+	if maxOpen <= 0 {
+		maxOpen = 25
+	}
+	if maxIdle <= 0 {
+		maxIdle = maxOpen / 2
+		if maxIdle < 5 {
+			maxIdle = 5
+		}
 	}
 	db, err := sqlx.Open("mysql", dsn)
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(20)
-	db.SetMaxIdleConns(10)
+	db.SetMaxOpenConns(maxOpen)
+	db.SetMaxIdleConns(maxIdle)
 	db.SetConnMaxLifetime(5 * time.Minute)
 	return db, nil
 }
