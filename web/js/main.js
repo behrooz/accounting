@@ -476,6 +476,37 @@
     };
   }
 
+  var SHOP_IN_STOCK_KEY = "aberang_shop_in_stock_only";
+
+  function shopInStockOnly() {
+    var $el = $("#shopInStockOnly");
+    if (!$el.length) return true;
+    return !!$el.prop("checked");
+  }
+
+  function initShopInStockSwitch() {
+    var $el = $("#shopInStockOnly");
+    if (!$el.length) return;
+    var saved = null;
+    try {
+      saved = localStorage.getItem(SHOP_IN_STOCK_KEY);
+    } catch (e) {}
+    if (saved === null) {
+      $el.prop("checked", true);
+    } else {
+      $el.prop("checked", saved === "1");
+    }
+    $el.off("change.shopInStock").on("change.shopInStock", function () {
+      try {
+        localStorage.setItem(
+          SHOP_IN_STOCK_KEY,
+          $el.prop("checked") ? "1" : "0"
+        );
+      } catch (e) {}
+      renderShop();
+    });
+  }
+
   function faNum(n) {
     return Number(n || 0).toLocaleString("fa-IR");
   }
@@ -631,10 +662,10 @@
           known[p.id] = true;
         });
         batch.forEach(function (p) {
-          if (!known[p.id]) {
-            known[p.id] = true;
-            current.push(p);
-          }
+          if (known[p.id]) return;
+          if (context === "home" && productIsOutOfStock(p)) return;
+          known[p.id] = true;
+          current.push(p);
         });
         window.ABERANG_PRODUCTS = current;
         productPaging.offset = offset + batch.length;
@@ -892,7 +923,9 @@
   function renderHome() {
     var $grid = $("#homeProducts");
     if (!$grid.length) return;
-    var list = getProducts();
+    var list = getProducts().filter(function (p) {
+      return !productIsOutOfStock(p);
+    });
     if (!list.length) {
       $grid.html(
         '<p class="cat-loading">هنوز محصولی ثبت نشده است.</p>'
@@ -911,6 +944,11 @@
     if (!$grid.length) return;
 
     var list = getProducts();
+    if (shopInStockOnly()) {
+      list = list.filter(function (p) {
+        return !productIsOutOfStock(p);
+      });
+    }
     updateShopMeta(list);
     $grid.html(list.map(productCard).join(""));
     $("#shopEmpty").prop("hidden", list.length > 0);
@@ -2059,6 +2097,7 @@
       $(this).val(n);
     });
 
+    initShopInStockSwitch();
     $("#shopFilterBtn").on("click", function () {
       renderShopFilterCats();
       openShopSheet("shopFilterSheet");
