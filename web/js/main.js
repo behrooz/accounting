@@ -509,15 +509,45 @@
     if ($home.length) return fetchProductBatch("home", true);
   }
 
+  function shopSaleActive() {
+    return (
+      window.location.hash === "#sale" ||
+      String(queryParam("sort") || "").toLowerCase() === "sale"
+    );
+  }
+
   function shopListParams() {
     var sort = $("#sortFilter").val() || queryParam("sort") || "new";
-    if (window.location.hash === "#sale") sort = "sale";
+    if (shopSaleActive()) sort = "sale";
     return {
       sort: sort,
       categoryId: queryParam("categoryId") || "",
       cat: queryParam("cat") || "",
       q: (queryParam("q") || "").trim()
     };
+  }
+
+  function openShopSale(clearFilters) {
+    closeMenu();
+    closeShopSheets();
+    $("#sortFilter").val("sale");
+
+    if ($("#shopProducts").length) {
+      var url = new URL(window.location.href);
+      if (clearFilters) {
+        url.searchParams.delete("categoryId");
+        url.searchParams.delete("cat");
+        url.searchParams.delete("q");
+        $("#shopSearchInput").val("");
+      }
+      url.searchParams.set("sort", "sale");
+      url.hash = "sale";
+      history.pushState(null, "", url.pathname + url.search + url.hash);
+      loadShopProducts(true);
+      return;
+    }
+
+    window.location.href = "shop.html?sort=sale#sale";
   }
 
   var SHOP_IN_STOCK_KEY = "aberang_shop_in_stock_only";
@@ -561,7 +591,7 @@
     var q = params.q;
     if (q) {
       crumb = "نتایج «" + q + "»";
-    } else if (params.sort === "sale" || window.location.hash === "#sale") {
+    } else if (params.sort === "sale" || shopSaleActive()) {
       crumb = "فروش ویژه";
     } else if (params.categoryId && Array.isArray(window.ABERANG_CATEGORIES)) {
       var match = window.ABERANG_CATEGORIES.find(function (c) {
@@ -652,7 +682,7 @@
     else if (url.hash === "#sale") url.hash = "";
     history.replaceState(null, "", url.pathname + url.search + url.hash);
     closeShopSheets();
-    loadShopProducts();
+    loadShopProducts(true);
   }
 
   function productBatchData(context, offset) {
@@ -989,7 +1019,7 @@
 
     var list = getProducts();
     var params = shopListParams();
-    if (params.sort === "sale" || window.location.hash === "#sale") {
+    if (params.sort === "sale" || shopSaleActive()) {
       list = list.filter(function (p) {
         return !!(p.onSale || (Number(p.discountPercent) || 0) > 0);
       });
@@ -1004,7 +1034,7 @@
     $("#shopEmpty").prop("hidden", list.length > 0);
     if (list.length === 0) {
       $("#shopEmpty").text(
-        params.sort === "sale" || window.location.hash === "#sale"
+        params.sort === "sale" || shopSaleActive()
           ? "فعلاً محصول تخفیف‌داری موجود نیست."
           : "محصولی پیدا نشد."
       );
@@ -1844,7 +1874,7 @@
       '<span class="cat-icon cat-all">' +
       catIconHtml("all") +
       "</span><span>همه لباس‌ها</span></a>" +
-      '<a href="shop.html#sale" class="cat-item">' +
+      '<a href="shop.html?sort=sale#sale" class="cat-item cat-item-sale">' +
       '<span class="cat-icon cat-sale">' +
       catIconHtml("sale") +
       "</span><span>فروش ویژه</span></a>";
@@ -2088,10 +2118,15 @@
     loadCategories();
     loadProducts();
 
-    $(window).on("hashchange.shop", function () {
+    $(window).on("hashchange.shop popstate.shop", function () {
       if ($("#shopProducts").length) {
         loadShopProducts(true);
       }
+    });
+
+    $(document).on("click", "a.menu-link-sale, a.cat-item-sale", function (e) {
+      e.preventDefault();
+      openShopSale(true);
     });
 
     $(window).off("scroll.products").on("scroll.products", function () {
