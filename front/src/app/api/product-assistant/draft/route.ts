@@ -3,17 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Agent, CursorAgentError } from "@cursor/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { verifyDashboardToken } from "@/lib/dashboardAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function apiBaseUrl(): string {
-  const raw =
-    process.env.API_BASE_URL ??
-    process.env.NEXT_PUBLIC_API_BASE_URL ??
-    "https://ns-xp45-default-accounting-api.bugx.ir/api";
-  return raw.replace(/\/$/, "");
-}
 
 type DraftAttribute = {
   name: string;
@@ -207,39 +200,6 @@ function normalizeDraft(value: unknown): ProductAssistantDraft {
   };
 }
 
-async function verifyDashboardToken(
-  authorization: string,
-): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
-  if (!authorization.toLowerCase().startsWith("bearer ")) {
-    return { ok: false, status: 401, error: "توکن ورود ارسال نشده است." };
-  }
-  try {
-    const response = await fetch(`${apiBaseUrl()}/me`, {
-      headers: { Authorization: authorization },
-      cache: "no-store",
-    });
-    if (response.ok) return { ok: true };
-    if (response.status === 401) {
-      return {
-        ok: false,
-        status: 401,
-        error: "توکن ورود نامعتبر یا منقضی شده است. دوباره وارد شوید.",
-      };
-    }
-    return {
-      ok: false,
-      status: 502,
-      error: `بررسی توکن با API ناموفق بود (HTTP ${response.status}).`,
-    };
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : "network error";
-    return {
-      ok: false,
-      status: 502,
-      error: `اتصال به API برای بررسی توکن برقرار نشد: ${detail}`,
-    };
-  }
-}
 
 function buildPrompt(description: string): string {
   return `You convert Persian clothing-store product descriptions into strict JSON.

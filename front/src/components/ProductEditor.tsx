@@ -16,6 +16,7 @@ import {
   generateProductDraft,
   type ProductAssistantDraft,
 } from "@/lib/productAssistant";
+import { transformProductImage } from "@/lib/productImageAi";
 import VariantsGrid from "./VariantsGrid";
 
 /** Repair variants whose attributeValues are empty/stale but attributes have options. */
@@ -200,6 +201,12 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
   const [generatingDraft, setGeneratingDraft] = useState(false);
   const [assistantError, setAssistantError] = useState("");
   const [assistantMessage, setAssistantMessage] = useState("");
+  const [imageAiPrompt, setImageAiPrompt] = useState("");
+  const [transformingImageIndex, setTransformingImageIndex] = useState<
+    number | null
+  >(null);
+  const [imageAiError, setImageAiError] = useState("");
+  const [imageAiMessage, setImageAiMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -296,6 +303,70 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
       ...p,
       images: (p.images ?? []).filter((_, i) => i !== index),
     }));
+
+  const handleTransformImage = async (index: number) => {
+    const prompt = imageAiPrompt.trim();
+    const path = images[index];
+    if (!path) return;
+    if (prompt.length < 5) {
+      setImageAiError("دستور ویرایش تصویر را در کادر زیر وارد کنید.");
+      return;
+    }
+
+    setTransformingImageIndex(index);
+    setImageAiError("");
+    setImageAiMessage("");
+    try {
+      const uploaded = await transformProductImage(path, prompt);
+      setProduct((p) => {
+        const nextImages = [...(p.images ?? [])];
+        nextImages[index] = uploaded.path;
+        return { ...p, images: nextImages };
+      });
+      setImageAiMessage("تصویر با هوش مصنوعی جایگزین شد. در صورت نیاز ذخیره محصول را بزنید.");
+    } catch (error) {
+      setImageAiError(
+        error instanceof Error ? error.message : "ویرایش تصویر ناموفق بود.",
+      );
+    } finally {
+      setTransformingImageIndex(null);
+    }
+  };
+
+  const handleTransformAllImages = async () => {
+    if (!images.length) return;
+    const prompt = imageAiPrompt.trim();
+    if (prompt.length < 5) {
+      setImageAiError("دستور ویرایش تصویر را در کادر زیر وارد کنید.");
+      return;
+    }
+
+    setImageAiError("");
+    setImageAiMessage("");
+    for (let index = 0; index < images.length; index += 1) {
+      const path = images[index];
+      if (!path) continue;
+      setTransformingImageIndex(index);
+      try {
+        const uploaded = await transformProductImage(path, prompt);
+        setProduct((p) => {
+          const nextImages = [...(p.images ?? [])];
+          nextImages[index] = uploaded.path;
+          return { ...p, images: nextImages };
+        });
+      } catch (error) {
+        setImageAiError(
+          error instanceof Error
+            ? error.message
+            : `ویرایش تصویر ${index + 1} ناموفق بود.`,
+        );
+        setTransformingImageIndex(null);
+        return;
+      }
+    }
+    setTransformingImageIndex(null);
+    setImageAiMessage("همه تصاویر با هوش مصنوعی جایگزین شدند. در صورت نیاز ذخیره محصول را بزنید.");
+  };
 
   const handleMoveImage = (index: number, dir: -1 | 1) =>
     setProduct((p) => {
@@ -586,6 +657,45 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
             </button>
           </div>
         </div>
+        <div className="space-y-3 border-b border-[#d5dbdb] px-5 py-4">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-[#545b64]">
+              دستور ویرایش تصویر با Gemini
+            </span>
+            <textarea
+              value={imageAiPrompt}
+              onChange={(event) => setImageAiPrompt(event.target.value)}
+              rows={3}
+              placeholder="مثال: پس‌زمینه سفید استودیویی، نور طبیعی، لباس روی مانکن بدون صورت..."
+              className="w-full resize-y rounded border border-[#aab7b8] bg-white px-3 py-2 text-sm leading-7 text-[#16191f] placeholder:text-[#879596] outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]"
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={!images.length || transformingImageIndex !== null}
+              onClick={() => void handleTransformAllImages()}
+              className="rounded bg-[#7c3aed] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#6d28d9] disabled:cursor-wait disabled:opacity-60"
+            >
+              {transformingImageIndex !== null
+                ? "در حال ویرایش تصاویر…"
+                : "AI برای همه تصاویر"}
+            </button>
+            <span className="text-xs text-[#545b64]">
+              روی هر تصویر هم می‌توانید دکمه AI را بزنید تا فقط همان تصویر جایگزین شود.
+            </span>
+          </div>
+          {imageAiError ? (
+            <p className="rounded border border-[#f1b5a9] bg-[#fdf3f1] px-3 py-2 text-sm text-[#b12704]">
+              {imageAiError}
+            </p>
+          ) : null}
+          {imageAiMessage ? (
+            <p className="rounded border border-[#82c6a3] bg-[#f2fbf6] px-3 py-2 text-sm text-[#1d6f42]">
+              {imageAiMessage}
+            </p>
+          ) : null}
+        </div>
         <div className="p-5">
           {images.length === 0 ? (
             <button
@@ -608,10 +718,15 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
                     alt=""
                     className="aspect-square w-full object-cover"
                   />
+                  {transformingImageIndex === index ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-xs font-medium text-white">
+                      در حال ویرایش با AI…
+                    </div>
+                  ) : null}
                   <div className="absolute inset-x-0 bottom-0 flex justify-between gap-1 bg-black/55 p-1.5 opacity-0 transition group-hover:opacity-100">
                     <button
                       type="button"
-                      disabled={index === 0}
+                      disabled={index === 0 || transformingImageIndex !== null}
                       onClick={() => handleMoveImage(index, -1)}
                       className="rounded bg-white/90 px-2 py-0.5 text-xs disabled:opacity-40"
                       title="جابه‌جایی به قبل"
@@ -620,6 +735,16 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
                     </button>
                     <button
                       type="button"
+                      disabled={transformingImageIndex !== null}
+                      onClick={() => void handleTransformImage(index)}
+                      className="rounded bg-[#7c3aed] px-2 py-0.5 text-xs font-medium text-white disabled:opacity-40"
+                      title="ویرایش با Gemini"
+                    >
+                      AI
+                    </button>
+                    <button
+                      type="button"
+                      disabled={transformingImageIndex !== null}
                       onClick={() => handleRemoveImage(index)}
                       className="rounded bg-[#d13212] px-2 py-0.5 text-xs text-white"
                     >
@@ -627,7 +752,10 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
                     </button>
                     <button
                       type="button"
-                      disabled={index === images.length - 1}
+                      disabled={
+                        index === images.length - 1 ||
+                        transformingImageIndex !== null
+                      }
                       onClick={() => handleMoveImage(index, 1)}
                       className="rounded bg-white/90 px-2 py-0.5 text-xs disabled:opacity-40"
                       title="جابه‌جایی به بعد"
