@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import {
   apiBaseUrl,
@@ -164,12 +164,20 @@ export async function POST(request: NextRequest) {
   try {
     const source = await fetchSourceImage(imagePath);
     const ai = new GoogleGenAI({ apiKey });
-    const chat = ai.chats.create({ model: geminiModel() });
-    const response = await chat.sendMessage({
-      content: [
-        { inlineData: { mimeType: source.mimeType, data: source.base64 } },
-        buildImagePrompt(prompt),
+    const response = await ai.models.generateContent({
+      model: geminiModel(),
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: source.mimeType, data: source.base64 } },
+            { text: buildImagePrompt(prompt) },
+          ],
+        },
       ],
+      config: {
+        responseModalities: [Modality.IMAGE],
+      },
     });
 
     const generated = extractGeneratedImage(response);
