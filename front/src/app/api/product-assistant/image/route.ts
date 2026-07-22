@@ -1,4 +1,7 @@
-import { GoogleGenAI, Modality } from "@google/genai";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { extname, join } from "node:path";
+import { Agent, CursorAgentError } from "@cursor/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import {
   apiBaseUrl,
@@ -15,22 +18,39 @@ type UploadedImage = {
   filename: string;
 };
 
+type GeneratedImage = {
+  base64: string;
+  mimeType: string;
+};
+
 function text(value: unknown, max = 4000): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
-function geminiModel(): string {
-  return (
-    process.env.GEMINI_IMAGE_MODEL?.trim() || "gemini-2.5-flash-image"
-  );
+function mimeFromPath(path: string): string {
+  const ext = extname(path).toLowerCase();
+  if (ext === ".png") return "image/png";
+  if (ext === ".webp") return "image/webp";
+  if (ext === ".gif") return "image/gif";
+  return "image/jpeg";
+}
+
+function extensionForMime(mimeType: string): string {
+  if (mimeType.includes("png")) return "png";
+  if (mimeType.includes("webp")) return "webp";
+  if (mimeType.includes("gif")) return "gif";
+  return "jpg";
 }
 
 function buildImagePrompt(userPrompt: string): string {
   return [
     "You are editing a product photo for an online clothing store.",
-    "Return only the edited image as output.",
+    "The attached image is the original product photo.",
+    "Use the generateImage tool to create an edited replacement image.",
+    "Save the generated file as output.png in the working directory.",
     "Keep the result realistic, high quality, and suitable for e-commerce.",
     "Do not add text, watermarks, or logos unless explicitly requested.",
+    "Do not edit source code. Only generate the edited product image.",
     "",
     "User instructions:",
     userPrompt,
@@ -39,7 +59,7 @@ function buildImagePrompt(userPrompt: string): string {
 
 async function fetchSourceImage(
   imagePath: string,
-): Promise<{ base64: string; mimeType: string }> {
+): Promise<{ base64: string; mimeType: string; buffer: Buffer }> {
   const rel = imagePath.replace(/^\//, "");
   if (!rel || rel.includes("..")) {
     throw new Error("مسیر تصویر نامعتبر است.");
@@ -61,28 +81,119 @@ async function fetchSourceImage(
     throw new Error("حجم تصویر برای پردازش هوش مصنوعی بیش از حد مجاز است.");
   }
 
-  return { base64: buffer.toString("base64"), mimeType };
+  return { base64: buffer.toString("base64"), mimeType, buffer };
 }
 
-function extractGeneratedImage(response: {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        inlineData?: { data?: string; mimeType?: string };
-      }>;
-    };
-  }>;
-}): { base64: string; mimeType: string } | null {
-  const parts = response.candidates?.[0]?.content?.parts ?? [];
-  for (const part of parts) {
-    const data = part.inlineData?.data;
-    if (!data) continue;
+function extractImageDataFromUnknown(value: unknown): GeneratedImage | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+
+  if (row.status === "success" && row.value && typeof row.value === "object") {
+    const success = row.value as Record<string, unknown>;
+    if (typeof success.imageData === "string" && success.imageData) {
+      return {
+        base64: success.imageData.replace(/^data:[^;]+;base64,/, ""),
+        mimeType:
+          typeof success.filePath === "string"
+            ? mimeFromPath(success.filePath)
+            : "image/png",
+      };
+    }
+  }
+
+  if (typeof row.imageData === "string" && row.imageData) {
     return {
-      base64: data,
-      mimeType: part.inlineData?.mimeType || "image/png",
+      base64: row.imageData.replace(/^data:[^;]+;base64,/, ""),
+      mimeType:
+        typeof row.filePath === "string"
+          ? mimeFromPath(row.filePath)
+          : "image/png",
+    };
+  }
+
+  return null;
+}
+
+async function readGeneratedFileFromCwd(
+  cwd: string,
+  sourceName: string,
+): Promise<GeneratedImage | null> {
+  const names = await readdir(cwd).catch(() => [] as string[]);
+  const preferred = names.find((name) => /^output\.(png|jpe?g|webp|gif)$/i.test(name));
+  const candidates = preferred
+    ? [preferred]
+    : names.filter(
+        (name) =>
+          name !== sourceName &&
+          /\.(png|jpe?g|webp|gif)$/i.test(name),
+      );
+
+  for (const name of candidates) {
+    const buffer = await readFile(join(cwd, name)).catch(() => null);
+    if (!buffer?.length) continue;
+    return {
+      base64: buffer.toString("base64"),
+      mimeType: mimeFromPath(name),
     };
   }
   return null;
+}
+
+async function generateWithCursor(options: {
+  apiKey: string;
+  prompt: string;
+  source: { base64: string; mimeType: string; buffer: Buffer };
+}): Promise<GeneratedImage> {
+  const cwd = await mkdtemp(join(tmpdir(), "product-image-ai-"));
+  const sourceExt = extensionForMime(options.source.mimeType);
+  const sourceName = `source.${sourceExt}`;
+
+  try {
+    await writeFile(join(cwd, sourceName), options.source.buffer);
+
+    await using agent = await Agent.create({
+      apiKey: options.apiKey,
+      model: { id: "auto" },
+      local: { cwd, settingSources: [] },
+      name: "Dashboard Product Image Assistant",
+    });
+
+    const run = await agent.send({
+      text: buildImagePrompt(options.prompt),
+      images: [
+        {
+          data: options.source.base64,
+          mimeType: options.source.mimeType,
+        },
+      ],
+    });
+
+    let generated: GeneratedImage | null = null;
+    for await (const event of run.stream()) {
+      if (event.type !== "tool_call") continue;
+      const name = String(event.name || "").toLowerCase();
+      if (!name.includes("generateimage") && name !== "generate_image") continue;
+      if (event.status !== "completed") continue;
+      generated = extractImageDataFromUnknown(event.result) ?? generated;
+    }
+
+    const result = await run.wait();
+    if (result.status === "error") {
+      throw new Error(result.error?.message || "ویرایش تصویر با Cursor ناموفق بود.");
+    }
+
+    if (!generated) {
+      generated = await readGeneratedFileFromCwd(cwd, sourceName);
+    }
+    if (!generated) {
+      throw new Error(
+        "Cursor تصویر جدیدی برنگرداند. دستور را تغییر دهید و دوباره تلاش کنید.",
+      );
+    }
+    return generated;
+  } finally {
+    await rm(cwd, { recursive: true, force: true }).catch(() => undefined);
+  }
 }
 
 async function uploadGeneratedImage(
@@ -90,11 +201,7 @@ async function uploadGeneratedImage(
   buffer: Buffer,
   mimeType: string,
 ): Promise<UploadedImage> {
-  const ext = mimeType.includes("png")
-    ? "png"
-    : mimeType.includes("webp")
-      ? "webp"
-      : "jpg";
+  const ext = extensionForMime(mimeType);
   const form = new FormData();
   const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
   form.append("file", blob, `ai-${Date.now()}.${ext}`);
@@ -126,10 +233,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  const apiKey = process.env.CURSOR_API_KEY?.trim();
   if (!apiKey) {
     return NextResponse.json(
-      { error: "کلید Gemini روی سرور تنظیم نشده است (GEMINI_API_KEY)." },
+      { error: "کلید Cursor روی سرور تنظیم نشده است (CURSOR_API_KEY)." },
       { status: 503 },
     );
   }
@@ -163,41 +270,24 @@ export async function POST(request: NextRequest) {
 
   try {
     const source = await fetchSourceImage(imagePath);
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: geminiModel(),
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { mimeType: source.mimeType, data: source.base64 } },
-            { text: buildImagePrompt(prompt) },
-          ],
-        },
-      ],
-      config: {
-        responseModalities: [Modality.IMAGE],
-      },
+    const generated = await generateWithCursor({
+      apiKey,
+      prompt,
+      source,
     });
-
-    const generated = extractGeneratedImage(response);
-    if (!generated) {
-      return NextResponse.json(
-        { error: "Gemini تصویر جدیدی برنگرداند. دستور را تغییر دهید و دوباره تلاش کنید." },
-        { status: 502 },
-      );
-    }
-
     const uploaded = await uploadGeneratedImage(
       authorization,
       Buffer.from(generated.base64, "base64"),
       generated.mimeType,
     );
-
     return NextResponse.json({ image: uploaded });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "ویرایش تصویر ناموفق بود.";
+      error instanceof CursorAgentError
+        ? `Cursor: ${error.message}`
+        : error instanceof Error
+          ? error.message
+          : "ویرایش تصویر ناموفق بود.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

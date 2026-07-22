@@ -530,8 +530,8 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
             </h2>
             <p className="mt-1 text-xs leading-5 text-[#545b64]">
               توضیحات را آزاد بنویسید تا عنوان، دسته، ویژگی‌ها، ترکیب‌ها، قیمت و
-              موجودی به‌صورت پیش‌نویس تکمیل شوند. تصاویر فقط با همان فایل اصلی
-              آپلود می‌شوند و برای Cursor ارسال یا تحلیل نمی‌شوند.
+              موجودی به‌صورت پیش‌نویس تکمیل شوند. برای ویرایش تصاویر از دکمه AI
+              در بخش تصاویر استفاده کنید.
             </p>
           </div>
           <div className="space-y-3 p-5">
@@ -660,7 +660,7 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
         <div className="space-y-3 border-b border-[#d5dbdb] px-5 py-4">
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-[#545b64]">
-              دستور ویرایش تصویر با Gemini
+              دستور ویرایش تصویر با Cursor AI
             </span>
             <textarea
               value={imageAiPrompt}
@@ -738,7 +738,7 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
                       disabled={transformingImageIndex !== null}
                       onClick={() => void handleTransformImage(index)}
                       className="rounded bg-[#7c3aed] px-2 py-0.5 text-xs font-medium text-white disabled:opacity-40"
-                      title="ویرایش با Gemini"
+                      title="ویرایش با Cursor AI"
                     >
                       AI
                     </button>
