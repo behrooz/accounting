@@ -678,7 +678,7 @@ export default function ProductEditor({ initialProduct, isNew }: Props) {
               className="rounded bg-[#7c3aed] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#6d28d9] disabled:cursor-wait disabled:opacity-60"
             >
               {transformingImageIndex !== null
-                ? "در حال ویرایش تصاویر…"
+                ? "در حال ویرایش تصاویر… (ممکن است چند دقیقه طول بکشد)"
                 : "AI برای همه تصاویر"}
             </button>
             <span className="text-xs text-[#545b64]">

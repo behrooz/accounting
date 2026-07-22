@@ -8,9 +8,15 @@ import {
   apiOrigin,
   verifyDashboardToken,
 } from "@/lib/dashboardAuth";
+import {
+  createImageJob,
+  getImageJob,
+  updateImageJob,
+} from "@/lib/productImageJobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 600;
 
 type UploadedImage = {
   path: string;
@@ -51,6 +57,7 @@ function buildImagePrompt(userPrompt: string): string {
     "Keep the result realistic, high quality, and suitable for e-commerce.",
     "Do not add text, watermarks, or logos unless explicitly requested.",
     "Do not edit source code. Only generate the edited product image.",
+    "Finish as quickly as possible after the image is generated.",
     "",
     "User instructions:",
     userPrompt,
@@ -119,13 +126,14 @@ async function readGeneratedFileFromCwd(
   sourceName: string,
 ): Promise<GeneratedImage | null> {
   const names = await readdir(cwd).catch(() => [] as string[]);
-  const preferred = names.find((name) => /^output\.(png|jpe?g|webp|gif)$/i.test(name));
+  const preferred = names.find((name) =>
+    /^output\.(png|jpe?g|webp|gif)$/i.test(name),
+  );
   const candidates = preferred
     ? [preferred]
     : names.filter(
         (name) =>
-          name !== sourceName &&
-          /\.(png|jpe?g|webp|gif)$/i.test(name),
+          name !== sourceName && /\.(png|jpe?g|webp|gif)$/i.test(name),
       );
 
   for (const name of candidates) {
@@ -175,11 +183,21 @@ async function generateWithCursor(options: {
       if (!name.includes("generateimage") && name !== "generate_image") continue;
       if (event.status !== "completed") continue;
       generated = extractImageDataFromUnknown(event.result) ?? generated;
+      if (generated) {
+        try {
+          await run.cancel();
+        } catch {
+          /* ignore */
+        }
+        break;
+      }
     }
 
-    const result = await run.wait();
-    if (result.status === "error") {
-      throw new Error(result.error?.message || "ویرایش تصویر با Cursor ناموفق بود.");
+    const result = await run.wait().catch(() => null);
+    if (!generated && result?.status === "error") {
+      throw new Error(
+        result.error?.message || "ویرایش تصویر با Cursor ناموفق بود.",
+      );
     }
 
     if (!generated) {
@@ -226,6 +244,63 @@ async function uploadGeneratedImage(
   return (await response.json()) as UploadedImage;
 }
 
+async function runImageJob(options: {
+  jobId: string;
+  authorization: string;
+  apiKey: string;
+  imagePath: string;
+  prompt: string;
+}) {
+  updateImageJob(options.jobId, { status: "running" });
+  try {
+    const source = await fetchSourceImage(options.imagePath);
+    const generated = await generateWithCursor({
+      apiKey: options.apiKey,
+      prompt: options.prompt,
+      source,
+    });
+    const uploaded = await uploadGeneratedImage(
+      options.authorization,
+      Buffer.from(generated.base64, "base64"),
+      generated.mimeType,
+    );
+    updateImageJob(options.jobId, { status: "done", image: uploaded });
+  } catch (error) {
+    const message =
+      error instanceof CursorAgentError
+        ? `Cursor: ${error.message}`
+        : error instanceof Error
+          ? error.message
+          : "ویرایش تصویر ناموفق بود.";
+    updateImageJob(options.jobId, { status: "error", error: message });
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const authorization = request.headers.get("authorization") ?? "";
+  const auth = await verifyDashboardToken(authorization);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  const jobId = text(request.nextUrl.searchParams.get("jobId"), 80);
+  if (!jobId) {
+    return NextResponse.json({ error: "jobId required" }, { status: 400 });
+  }
+
+  const job = getImageJob(jobId);
+  if (!job) {
+    return NextResponse.json({ error: "job not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    jobId: job.id,
+    status: job.status,
+    image: job.image,
+    error: job.error,
+  });
+}
+
 export async function POST(request: NextRequest) {
   const authorization = request.headers.get("authorization") ?? "";
   const auth = await verifyDashboardToken(authorization);
@@ -268,26 +343,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  try {
-    const source = await fetchSourceImage(imagePath);
-    const generated = await generateWithCursor({
-      apiKey,
-      prompt,
-      source,
-    });
-    const uploaded = await uploadGeneratedImage(
-      authorization,
-      Buffer.from(generated.base64, "base64"),
-      generated.mimeType,
-    );
-    return NextResponse.json({ image: uploaded });
-  } catch (error) {
-    const message =
-      error instanceof CursorAgentError
-        ? `Cursor: ${error.message}`
-        : error instanceof Error
-          ? error.message
-          : "ویرایش تصویر ناموفق بود.";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
+  const job = createImageJob();
+  void runImageJob({
+    jobId: job.id,
+    authorization,
+    apiKey,
+    imagePath,
+    prompt,
+  });
+
+  return NextResponse.json(
+    { jobId: job.id, status: job.status },
+    { status: 202 },
+  );
 }
