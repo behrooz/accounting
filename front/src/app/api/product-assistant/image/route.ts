@@ -96,7 +96,7 @@ async function uploadGeneratedImage(
       ? "webp"
       : "jpg";
   const form = new FormData();
-  const blob = new Blob([buffer], { type: mimeType });
+  const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
   form.append("file", blob, `ai-${Date.now()}.${ext}`);
 
   const response = await fetch(`${apiBaseUrl()}/uploads/product`, {
