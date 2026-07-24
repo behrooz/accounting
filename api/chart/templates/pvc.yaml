@@ -1,4 +1,4 @@
-{{- if .Values.persistence.enabled }}
+{{- if and .Values.persistence.enabled (eq (.Values.persistence.type | default "hostPath") "pvc") }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -12,6 +12,34 @@ spec:
     requests:
       storage: {{ .Values.persistence.size | default "5Gi" | quote }}
   {{- if hasKey .Values.persistence "storageClassName" }}
+  {{- if not (eq .Values.persistence.storageClassName nil) }}
   storageClassName: {{ .Values.persistence.storageClassName | quote }}
   {{- end }}
+  {{- end }}
+{{- end }}
+{{- if and .Values.persistence.enabled (eq (.Values.persistence.type | default "hostPath") "pvc") .Values.persistence.createPV }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "accounting-api.fullname" . }}-assets
+  labels:
+    {{- include "accounting-api.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.persistence.size | default "5Gi" | quote }}
+  accessModes:
+    - {{ .Values.persistence.accessMode | default "ReadWriteOnce" }}
+  persistentVolumeReclaimPolicy: {{ .Values.persistence.reclaimPolicy | default "Retain" }}
+  {{- if hasKey .Values.persistence "storageClassName" }}
+  {{- if not (eq .Values.persistence.storageClassName nil) }}
+  storageClassName: {{ .Values.persistence.storageClassName | quote }}
+  {{- end }}
+  {{- end }}
+  hostPath:
+    path: {{ .Values.persistence.hostPath | quote }}
+    type: DirectoryOrCreate
+  claimRef:
+    namespace: {{ .Release.Namespace }}
+    name: {{ include "accounting-api.fullname" . }}-assets
 {{- end }}

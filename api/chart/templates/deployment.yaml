@@ -87,8 +87,14 @@ spec:
       volumes:
         {{- if .Values.persistence.enabled }}
         - name: api-assets
+          {{- if eq (.Values.persistence.type | default "hostPath") "hostPath" }}
+          hostPath:
+            path: {{ .Values.persistence.hostPath | quote }}
+            type: DirectoryOrCreate
+          {{- else }}
           persistentVolumeClaim:
             claimName: {{ include "accounting-api.fullname" . }}-assets
+          {{- end }}
         {{- end }}
         {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}

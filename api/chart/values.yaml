@@ -163,16 +163,20 @@ readinessProbe:
   timeoutSeconds: 3
   failureThreshold: 3
 
-# Persist uploaded product images via PVC (same pattern as MySQL data-mysql-0).
-# Mounted at /app/assets inside the container. No hostPath — works under baseline PSS.
+# Persist uploaded product images at /app/assets.
+# Default: hostPath on the node at /opt/volume/abrang/api (local disk).
+# Alternative: type=pvc with storageClassName local-path (and optional static PV).
 persistence:
   enabled: true
+  type: hostPath
   mountPath: /app/assets
+  hostPath: /opt/volume/abrang/api
   size: 5Gi
   accessMode: ReadWriteOnce
-  # Omit to use cluster default (same as MySQL). Set "" only if you need it explicitly.
-  # storageClassName: ""
-
+  storageClassName: local-path
+  # When type=pvc and createPV=true, create a static PV bound to hostPath above.
+  createPV: false
+  reclaimPolicy: Retain
 # Additional volumes (appended after persistence volume when enabled)
 volumes: []
 
