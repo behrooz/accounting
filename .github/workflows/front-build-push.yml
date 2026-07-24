@@ -20,7 +20,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           config-inline: |
-            [registry."188.132.232.168:30836"]
+            [registry."45.94.214.130:30836"]
               http = true
               insecure = true
 
@@ -35,7 +35,7 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL || 'https://ns-xp45-default-accounting-api.bugx.ir/api' }}
           tags: |
-            188.132.232.168:30836/accounting-front:${{ github.run_number }}
+            45.94.214.130:30836/accounting-front:${{ github.run_number }}
           outputs: type=image,push=true,oci-mediatypes=false
           cache-from: type=gha
           cache-to: type=gha,mode=max

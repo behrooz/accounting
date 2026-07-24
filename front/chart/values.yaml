@@ -9,7 +9,7 @@ strategy:
     maxUnavailable: 1
 
 image:
-  repository: 188.132.232.168:30836/accounting-front
+  repository: 45.94.214.130:30836/accounting-front
   pullPolicy: IfNotPresent
   tag: "40"
 

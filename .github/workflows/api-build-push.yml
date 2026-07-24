@@ -20,7 +20,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           config-inline: |
-            [registry."188.132.232.168:30836"]
+            [registry."45.94.214.130:30836"]
               http = true
               insecure = true
 
@@ -31,8 +31,8 @@ jobs:
           file: ./api/Dockerfile
           push: true
           tags: |
-            188.132.232.168:30836/accounting-api:${{ github.run_number }}
-          cache-from: type=registry,ref=188.132.232.168:30836/accounting-api:${{ github.run_number }}
+            45.94.214.130:30836/accounting-api:${{ github.run_number }}
+          cache-from: type=registry,ref=45.94.214.130:30836/accounting-api:${{ github.run_number }}
           cache-to: type=inline
 
       - name: Install Helm
